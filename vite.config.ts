@@ -7,7 +7,11 @@ export default defineConfig({
   plugins: [
     react(),
     VitePWA({
+      injectRegister: false,
       registerType: "autoUpdate",
+      devOptions: {
+        enabled: true,
+      },
       manifestFilename: "manifest.json",
       includeAssets: ["favicon.ico", "robots.txt"],
       manifest: {

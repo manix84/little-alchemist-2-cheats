@@ -32,7 +32,9 @@ export const App = () => {
     console.log({ selectedID });
     setSelectedCombinations(selectedID ? getCombinations(selectedID) : undefined);
     setSelectedMakes(selectedID ? getMakesCombinations(selectedID) : undefined);
-    selectedID && console.log({ makesCombinations: getMakesCombinations(selectedID) });
+    if (selectedID) {
+      console.log({ makesCombinations: getMakesCombinations(selectedID) });
+    }
   }, [selectedID]);
 
   return (
