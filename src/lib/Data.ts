@@ -37,14 +37,14 @@ const useData = () => {
   return {
     isLoading,
     error,
-    getName: (id: string) => data?.[id].n,
+    getName: (id: string) => data?.[id]?.n,
     getImage: (id: string) => `${import.meta.env.BASE_URL}elements/${id}.svg`,
-    getCombinations: (id: string) => data?.[id].p,
+    getCombinations: (id: string) => data?.[id]?.p,
     getMakesCombinations: (id: string) => {
       const output: { [key: string]: string[][] } = {};
-      data?.[id].c?.forEach((cid) => {
+      data?.[id]?.c?.forEach((cid) => {
         output[cid] = [];
-        data?.[cid].p
+        data?.[cid]?.p
           ?.filter((combs) => combs.some((comb) => comb === id))
           .forEach((combs) => {
             output[cid].push(combs);

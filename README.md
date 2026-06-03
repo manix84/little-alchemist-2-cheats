@@ -9,6 +9,7 @@ The app lets you pick an element and see both sides of the recipe book:
 
 - **Combinations**: the recipes that create the selected element.
 - **Makes**: the elements you can create by combining the selected element with something else.
+- **Element pages**: each element has a clean URL, such as `/elements/2`, for sharing and direct loading.
 - **Fast local data**: recipes and image assets are served from `public/`.
 
 ## Try It ✨
@@ -103,6 +104,7 @@ public/elements/       Local element SVG icons
 public/brand/          Local brand/logo assets
 src/App.tsx            Main search and recipe display UI
 src/lib/Data.ts        Data loading and lookup helpers
+public/404.html        GitHub Pages fallback for direct clean URLs
 .github/workflows/     Build and GitHub Pages deployment
 ```
 

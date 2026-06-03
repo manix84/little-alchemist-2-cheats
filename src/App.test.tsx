@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, beforeEach, vi } from "vitest";
+import { MemoryRouter, useLocation } from "react-router-dom";
 import App from "./App";
 import { RawData } from "./lib/Data";
 
@@ -50,13 +51,26 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 
+const LocationPath = () => {
+  const location = useLocation();
+  return <span data-testid={"location-path"}>{location.pathname}</span>;
+};
+
+const renderApp = (initialEntries = ["/"]) =>
+  render(
+    <MemoryRouter initialEntries={initialEntries}>
+      <App />
+      <LocationPath />
+    </MemoryRouter>
+  );
+
 test("renders the element search", () => {
-  render(<App />);
+  renderApp();
   expect(screen.getByLabelText(/elements/i)).toBeInTheDocument();
 });
 
 test("dismisses the install prompt without showing it again", async () => {
-  render(<App />);
+  renderApp();
 
   const installEvent = new Event("beforeinstallprompt") as Event & {
     prompt: () => Promise<void>;
@@ -76,21 +90,45 @@ test("dismisses the install prompt without showing it again", async () => {
 });
 
 test("clicking an element tile navigates to that element", async () => {
-  render(<App />);
+  renderApp();
 
   fireEvent.change(screen.getByLabelText(/elements/i), { target: { value: "Energy" } });
   fireEvent.click(await screen.findByRole("option", { name: /energy/i }));
 
   expect(await screen.findByRole("heading", { name: /combinations/i })).toBeInTheDocument();
+  expect(screen.getByTestId("location-path")).toHaveTextContent("/elements/3");
 
   fireEvent.click(screen.getAllByRole("button", { name: /^air$/i })[0]);
 
   expect(screen.getAllByText("Air").length).toBeGreaterThan(0);
+  expect(screen.getByTestId("location-path")).toHaveTextContent("/elements/1");
   expect(window.scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "smooth" });
 });
 
+test("loads an element from its direct URL", async () => {
+  renderApp(["/elements/3"]);
+
+  expect(await screen.findByText("Energy")).toBeInTheDocument();
+  expect(screen.getByRole("heading", { name: /combinations \(0\/2\)/i })).toBeInTheDocument();
+});
+
+test("renders a 404 page for unknown routes and element URLs", async () => {
+  renderApp(["/missing"]);
+  expect(screen.getByRole("heading", { name: /page not found/i })).toBeInTheDocument();
+});
+
+test("renders a 404 page for unknown element IDs", async () => {
+  renderApp(["/elements/not-real"]);
+  expect(await screen.findByRole("heading", { name: /element not found/i })).toBeInTheDocument();
+});
+
+test("renders the 500 page route", () => {
+  renderApp(["/500"]);
+  expect(screen.getByRole("heading", { name: /something went wrong/i })).toBeInTheDocument();
+});
+
 test("stores discovered combinations locally", async () => {
-  render(<App />);
+  renderApp();
 
   fireEvent.change(screen.getByLabelText(/elements/i), { target: { value: "Energy" } });
   fireEvent.click(await screen.findByRole("option", { name: /energy/i }));
@@ -100,7 +138,7 @@ test("stores discovered combinations locally", async () => {
 });
 
 test("stores self-combinations with the exact duplicate element recipe", async () => {
-  render(<App />);
+  renderApp();
 
   fireEvent.change(screen.getByLabelText(/elements/i), { target: { value: "Fire" } });
   fireEvent.click(await screen.findByRole("option", { name: /fire \(0\/0\)/i }));
@@ -114,7 +152,7 @@ test("updates discovered state even when localStorage writes fail", async () => 
     throw new Error("Storage is disabled");
   });
 
-  render(<App />);
+  renderApp();
 
   fireEvent.change(screen.getByLabelText(/elements/i), { target: { value: "Energy" } });
   fireEvent.click(await screen.findByRole("option", { name: /energy \(0\/2\)/i }));
@@ -124,7 +162,7 @@ test("updates discovered state even when localStorage writes fail", async () => 
 });
 
 test("shows discovered and total combination counts after checking a recipe", async () => {
-  render(<App />);
+  renderApp();
 
   fireEvent.change(screen.getByLabelText(/elements/i), { target: { value: "Energy" } });
   fireEvent.click(await screen.findByRole("option", { name: /energy \(0\/2\)/i }));
@@ -139,7 +177,7 @@ test("shows discovered and total combination counts after checking a recipe", as
 test("shows discovered and total combination counts in element options", async () => {
   window.localStorage.setItem("la2-discovered-combinations", JSON.stringify(["3:1+2"]));
 
-  render(<App />);
+  renderApp();
 
   fireEvent.change(screen.getByLabelText(/elements/i), { target: { value: "Energy" } });
 
@@ -147,7 +185,7 @@ test("shows discovered and total combination counts in element options", async (
 });
 
 test("moves discovered combination rows to the bottom of the list", async () => {
-  render(<App />);
+  renderApp();
 
   fireEvent.change(screen.getByLabelText(/elements/i), { target: { value: "Energy" } });
   fireEvent.click(await screen.findByRole("option", { name: /energy/i }));
@@ -164,7 +202,7 @@ test("moves discovered combination rows to the bottom of the list", async () => 
 test("clears discovered combinations after danger confirmation", () => {
   window.localStorage.setItem("la2-discovered-combinations", JSON.stringify(["3:1+2"]));
 
-  render(<App />);
+  renderApp();
 
   fireEvent.click(screen.getByRole("button", { name: /clear discovered combinations/i }));
   expect(screen.getByRole("dialog", { name: /clear discovered combinations/i })).toBeInTheDocument();
