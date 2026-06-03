@@ -11,7 +11,7 @@ const getName = (elementID: string) =>
   })[elementID];
 
 test("renders discovered counts and rows with separators", () => {
-  render(
+  const { container } = render(
     <CombinationSection
       title={"Combinations"}
       rows={[
@@ -40,6 +40,7 @@ test("renders discovered counts and rows with separators", () => {
 
   expect(screen.getByRole("heading", { name: /combinations \(1\/2\)/i })).toBeInTheDocument();
   expect(screen.getAllByText("+")).toHaveLength(2);
+  expect(Array.from(container.querySelectorAll("button img")).every((image) => image.getAttribute("alt") === "")).toBe(true);
   expect(screen.getByTestId("combination-row-3:1+2")).toBeInTheDocument();
 });
 

@@ -7,9 +7,14 @@ type ClearDiscoveredDialogProps = {
 
 export const ClearDiscoveredDialog = ({ clearDiscoveredCombinations, closeDialog }: ClearDiscoveredDialogProps) => (
   <ModalBackdrop role={"presentation"}>
-    <ConfirmationDialog role={"dialog"} aria-modal={"true"} aria-labelledby={"clear-discovered-title"}>
+    <ConfirmationDialog
+      role={"dialog"}
+      aria-modal={"true"}
+      aria-labelledby={"clear-discovered-title"}
+      aria-describedby={"clear-discovered-description"}
+    >
       <ConfirmationTitle id={"clear-discovered-title"}>Clear discovered combinations?</ConfirmationTitle>
-      <ConfirmationText>This will remove all locally saved discovered checkmarks.</ConfirmationText>
+      <ConfirmationText id={"clear-discovered-description"}>This will remove all locally saved discovered checkmarks.</ConfirmationText>
       <ConfirmationActions>
         <CancelButton type={"button"} onClick={closeDialog}>
           Cancel

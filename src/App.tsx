@@ -17,6 +17,7 @@ import {
   formatCombinationCount,
   getDiscoveredCombinationCount,
   getStoredDiscoveredCombinations,
+  isSameCombination,
   sortByDiscoveredState,
 } from "./lib/discoveredCombinations";
 import { useInstallPrompt } from "./useInstallPrompt";
@@ -69,7 +70,7 @@ export const App = () => {
       Object.entries(selectedMakes).flatMap(([producesID, elementIDs]) =>
         elementIDs.map((elementID) => {
           const combination = getCombinations(producesID)?.find(
-            (candidateCombination) => candidateCombination.includes(selectedID) && candidateCombination.includes(elementID)
+            (candidateCombination) => isSameCombination(candidateCombination, [selectedID, elementID])
           ) ?? [selectedID, elementID];
 
           return {
@@ -112,13 +113,21 @@ export const App = () => {
       }
 
       const nextValue = Array.from(nextCombinations).sort();
-      window.localStorage.setItem(DISCOVERED_COMBINATIONS_KEY, JSON.stringify(nextValue));
+      try {
+        window.localStorage.setItem(DISCOVERED_COMBINATIONS_KEY, JSON.stringify(nextValue));
+      } catch {
+        // Keep the UI responsive even when browser storage is unavailable.
+      }
       return nextValue;
     });
   };
 
   const clearDiscoveredCombinations = () => {
-    window.localStorage.removeItem(DISCOVERED_COMBINATIONS_KEY);
+    try {
+      window.localStorage.removeItem(DISCOVERED_COMBINATIONS_KEY);
+    } catch {
+      // Clearing the in-memory state still gives the user the expected UI result.
+    }
     setDiscoveredCombinations([]);
     setIsClearDiscoveredOpen(false);
   };

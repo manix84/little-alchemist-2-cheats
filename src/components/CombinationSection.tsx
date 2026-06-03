@@ -52,7 +52,7 @@ export const CombinationSection = ({
                 <Fragment key={`${combinationKey}:${elementID}:${index}`}>
                   {symbolBefore && <ElementSymbol>{symbolBefore}</ElementSymbol>}
                   <ElementButton type={"button"} onClick={() => navigateToElement(elementID)}>
-                    <ElementImg src={getImage(elementID)} />
+                    <ElementImg src={getImage(elementID)} alt={""} />
                     <ElementName>{getName(elementID)}</ElementName>
                   </ElementButton>
                 </Fragment>

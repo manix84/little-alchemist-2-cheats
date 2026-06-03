@@ -8,7 +8,9 @@ test("confirms or cancels clearing discovered combinations", () => {
 
   render(<ClearDiscoveredDialog clearDiscoveredCombinations={clearDiscoveredCombinations} closeDialog={closeDialog} />);
 
-  expect(screen.getByRole("dialog", { name: /clear discovered combinations/i })).toBeInTheDocument();
+  expect(screen.getByRole("dialog", { name: /clear discovered combinations/i })).toHaveAccessibleDescription(
+    /remove all locally saved discovered checkmarks/i
+  );
 
   fireEvent.click(screen.getByRole("button", { name: /cancel/i }));
   fireEvent.click(screen.getByRole("button", { name: /clear all/i }));

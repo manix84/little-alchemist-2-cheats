@@ -13,13 +13,29 @@ export type CombinationRowItem = {
 export const getStoredDiscoveredCombinations = () => {
   try {
     const value = window.localStorage.getItem(DISCOVERED_COMBINATIONS_KEY);
-    return value ? JSON.parse(value) : [];
+    if (!value) return [];
+
+    const parsedValue: unknown = JSON.parse(value);
+    return Array.isArray(parsedValue) && parsedValue.every((combinationKey) => typeof combinationKey === "string") ? parsedValue : [];
   } catch {
     return [];
   }
 };
 
 export const createCombinationKey = (producesID: string, elementIDs: string[]) => `${producesID}:${elementIDs.join("+")}`;
+
+export const isSameCombination = (firstCombination: string[], secondCombination: string[]) => {
+  if (firstCombination.length !== secondCombination.length) return false;
+
+  const remainingElementIDs = [...secondCombination];
+  return firstCombination.every((elementID) => {
+    const matchingIndex = remainingElementIDs.indexOf(elementID);
+    if (matchingIndex === -1) return false;
+
+    remainingElementIDs.splice(matchingIndex, 1);
+    return true;
+  });
+};
 
 export const formatCombinationCount = (discoveredCount: number, totalCount: number) => `${discoveredCount}/${totalCount}`;
 

@@ -12,13 +12,24 @@ const testData: RawData = {
   "2": {
     prime: true,
     n: "Fire",
-    c: ["3"],
+    c: ["3", "5"],
   },
   "3": {
     n: "Energy",
     p: [
       ["1", "2"],
       ["2", "1"],
+    ],
+  },
+  "4": {
+    prime: true,
+    n: "Heat",
+  },
+  "5": {
+    n: "Spark",
+    p: [
+      ["2", "4"],
+      ["2", "2"],
     ],
   },
 };
@@ -86,6 +97,30 @@ test("stores discovered combinations locally", async () => {
   fireEvent.click((await screen.findAllByRole("checkbox", { name: /discovered/i }))[0]);
 
   expect(JSON.parse(window.localStorage.getItem("la2-discovered-combinations") ?? "[]")).toEqual(["3:1+2"]);
+});
+
+test("stores self-combinations with the exact duplicate element recipe", async () => {
+  render(<App />);
+
+  fireEvent.change(screen.getByLabelText(/elements/i), { target: { value: "Fire" } });
+  fireEvent.click(await screen.findByRole("option", { name: /fire \(0\/0\)/i }));
+  fireEvent.click(screen.getByTestId("combination-row-5:2+2").querySelector("input") as HTMLInputElement);
+
+  expect(JSON.parse(window.localStorage.getItem("la2-discovered-combinations") ?? "[]")).toEqual(["5:2+2"]);
+});
+
+test("updates discovered state even when localStorage writes fail", async () => {
+  vi.spyOn(window.localStorage, "setItem").mockImplementation(() => {
+    throw new Error("Storage is disabled");
+  });
+
+  render(<App />);
+
+  fireEvent.change(screen.getByLabelText(/elements/i), { target: { value: "Energy" } });
+  fireEvent.click(await screen.findByRole("option", { name: /energy \(0\/2\)/i }));
+  fireEvent.click((await screen.findAllByRole("checkbox", { name: /discovered/i }))[0]);
+
+  expect(screen.getByRole("heading", { name: /combinations \(1\/2\)/i })).toBeInTheDocument();
 });
 
 test("shows discovered and total combination counts after checking a recipe", async () => {
