@@ -41,13 +41,13 @@ const useData = () => {
     getImage: (id: string) => `${import.meta.env.BASE_URL}elements/${id}.svg`,
     getCombinations: (id: string) => data?.[id].p,
     getMakesCombinations: (id: string) => {
-      const output: { [key: string]: string[] } = {};
+      const output: { [key: string]: string[][] } = {};
       data?.[id].c?.forEach((cid) => {
         output[cid] = [];
         data?.[cid].p
           ?.filter((combs) => combs.some((comb) => comb === id))
           .forEach((combs) => {
-            output[cid].push(combs[0] === id ? combs[1] : combs[0]);
+            output[cid].push(combs);
           });
       });
       return output;

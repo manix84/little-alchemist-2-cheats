@@ -17,7 +17,6 @@ import {
   formatCombinationCount,
   getDiscoveredCombinationCount,
   getStoredDiscoveredCombinations,
-  isSameCombination,
   sortByDiscoveredState,
 } from "./lib/discoveredCombinations";
 import { useInstallPrompt } from "./useInstallPrompt";
@@ -67,17 +66,15 @@ export const App = () => {
     if (!selectedID || !selectedMakes) return [];
 
     return sortByDiscoveredState(
-      Object.entries(selectedMakes).flatMap(([producesID, elementIDs]) =>
-        elementIDs.map((elementID) => {
-          const combination = getCombinations(producesID)?.find(
-            (candidateCombination) => isSameCombination(candidateCombination, [selectedID, elementID])
-          ) ?? [selectedID, elementID];
+      Object.entries(selectedMakes).flatMap(([producesID, combinations]) =>
+        combinations.map((combination) => {
+          const otherElementID = combination.find((elementID) => elementID !== selectedID) ?? selectedID;
 
           return {
             combinationKey: createCombinationKey(producesID, combination),
             items: [
               { elementID: selectedID },
-              { elementID, symbolBefore: "+" as const },
+              { elementID: otherElementID, symbolBefore: "+" as const },
               { elementID: producesID, symbolBefore: "=" as const },
             ],
           };
@@ -85,7 +82,7 @@ export const App = () => {
       ),
       discoveredCombinationSet
     );
-  }, [discoveredCombinationSet, getCombinations, selectedID, selectedMakes]);
+  }, [discoveredCombinationSet, selectedID, selectedMakes]);
 
   const prefersDarkMode = useMediaQuery("(prefers-color-scheme: dark)");
   const theme = React.useMemo(

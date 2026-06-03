@@ -68,7 +68,7 @@ test("looks up combinations and reverse makes combinations", async () => {
   expect(result.current.getImage("3")).toBe(`${baseUrl}elements/3.svg`);
   expect(result.current.getCombinations("3")).toEqual([["1", "2"]]);
   expect(result.current.getMakesCombinations("1")).toEqual({
-    "3": ["2"],
+    "3": [["1", "2"]],
   });
 });
 
