@@ -88,6 +88,29 @@ test("stores discovered combinations locally", async () => {
   expect(JSON.parse(window.localStorage.getItem("la2-discovered-combinations") ?? "[]")).toEqual(["3:1+2"]);
 });
 
+test("shows discovered and total combination counts after checking a recipe", async () => {
+  render(<App />);
+
+  fireEvent.change(screen.getByLabelText(/elements/i), { target: { value: "Energy" } });
+  fireEvent.click(await screen.findByRole("option", { name: /energy \(0\/2\)/i }));
+
+  expect(await screen.findByRole("heading", { name: /combinations \(0\/2\)/i })).toBeInTheDocument();
+
+  fireEvent.click((await screen.findAllByRole("checkbox", { name: /discovered/i }))[0]);
+
+  expect(screen.getByRole("heading", { name: /combinations \(1\/2\)/i })).toBeInTheDocument();
+});
+
+test("shows discovered and total combination counts in element options", async () => {
+  window.localStorage.setItem("la2-discovered-combinations", JSON.stringify(["3:1+2"]));
+
+  render(<App />);
+
+  fireEvent.change(screen.getByLabelText(/elements/i), { target: { value: "Energy" } });
+
+  expect(await screen.findByRole("option", { name: /energy \(1\/2\)/i })).toBeInTheDocument();
+});
+
 test("moves discovered combination rows to the bottom of the list", async () => {
   render(<App />);
 

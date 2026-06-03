@@ -25,6 +25,14 @@ const getStoredDiscoveredCombinations = () => {
 
 const createCombinationKey = (producesID: string, elementIDs: string[]) => `${producesID}:${elementIDs.join("+")}`;
 
+const formatCombinationCount = (discoveredCount: number, totalCount: number) => `${discoveredCount}/${totalCount}`;
+
+const getDiscoveredCombinationCount = (
+  producesID: string,
+  combinations: string[][] | undefined,
+  discoveredCombinationSet: Set<string>
+) => combinations?.filter((combination) => discoveredCombinationSet.has(createCombinationKey(producesID, combination))).length ?? 0;
+
 const sortByDiscoveredState = <Row extends { combinationKey: string }>(rows: Row[], discoveredCombinationSet: Set<string>) =>
   [...rows].sort((firstRow, secondRow) => {
     const firstIsDiscovered = discoveredCombinationSet.has(firstRow.combinationKey);
@@ -40,11 +48,24 @@ export const App = () => {
   const [discoveredCombinations, setDiscoveredCombinations] = useState<string[]>(getStoredDiscoveredCombinations);
   const [isClearDiscoveredOpen, setIsClearDiscoveredOpen] = useState(false);
 
-  const options = getOptions();
-  const selectedOption = options.find((option) => option.id === selectedID) ?? null;
   const selectedCombinations = useMemo(() => (selectedID ? getCombinations(selectedID) : undefined), [getCombinations, selectedID]);
   const selectedMakes = useMemo(() => (selectedID ? getMakesCombinations(selectedID) : undefined), [getMakesCombinations, selectedID]);
   const discoveredCombinationSet = useMemo(() => new Set(discoveredCombinations), [discoveredCombinations]);
+  const options = useMemo(
+    () =>
+      getOptions().map((option) => {
+        const combinations = getCombinations(option.id);
+        const totalCombinationCount = combinations?.length ?? 0;
+        const optionDiscoveredCount = getDiscoveredCombinationCount(option.id, combinations, discoveredCombinationSet);
+
+        return {
+          ...option,
+          label: `${option.label} (${formatCombinationCount(optionDiscoveredCount, totalCombinationCount)})`,
+        };
+      }),
+    [discoveredCombinationSet, getCombinations, getOptions]
+  );
+  const selectedOption = options.find((option) => option.id === selectedID) ?? null;
   const discoveredCount = discoveredCombinations.length;
   const selectedCombinationRows = useMemo(() => {
     if (!selectedID || !selectedCombinations) return [];
@@ -63,7 +84,10 @@ export const App = () => {
     return sortByDiscoveredState(
       Object.entries(selectedMakes).flatMap(([producesID, elementIDs]) =>
         elementIDs.map((elementID) => {
-          const combination = [selectedID, elementID];
+          const combination = getCombinations(producesID)?.find(
+            (candidateCombination) => candidateCombination.includes(selectedID) && candidateCombination.includes(elementID)
+          ) ?? [selectedID, elementID];
+
           return {
             combination,
             combinationKey: createCombinationKey(producesID, combination),
@@ -74,7 +98,11 @@ export const App = () => {
       ),
       discoveredCombinationSet
     );
-  }, [discoveredCombinationSet, selectedID, selectedMakes]);
+  }, [discoveredCombinationSet, getCombinations, selectedID, selectedMakes]);
+  const selectedCombinationDiscoveredCount = selectedCombinationRows.filter(({ combinationKey }) =>
+    discoveredCombinationSet.has(combinationKey)
+  ).length;
+  const selectedMakesDiscoveredCount = selectedMakesRows.filter(({ combinationKey }) => discoveredCombinationSet.has(combinationKey)).length;
 
   const prefersDarkMode = useMediaQuery("(prefers-color-scheme: dark)");
   const theme = React.useMemo(
@@ -159,7 +187,7 @@ export const App = () => {
               </StickyPrimaryElement>
               {selectedCombinations && (
                 <>
-                  <h2>Combinations ({Object.values(selectedCombinations).length})</h2>
+                  <h2>Combinations ({formatCombinationCount(selectedCombinationDiscoveredCount, selectedCombinationRows.length)})</h2>
                   {selectedCombinationRows.map(({ combination, combinationKey }) => {
                     const isDiscovered = discoveredCombinationSet.has(combinationKey);
 
@@ -194,9 +222,7 @@ export const App = () => {
               )}
               {selectedMakes && (
                 <>
-                  <h2>
-                    Makes ({Object.values(selectedMakes).reduce((currentCount, row) => currentCount + row.length, 0)})
-                  </h2>
+                  <h2>Makes ({formatCombinationCount(selectedMakesDiscoveredCount, selectedMakesRows.length)})</h2>
                   {selectedMakesRows.map(({ combinationKey, elementID, producesID }) => {
                     const isDiscovered = discoveredCombinationSet.has(combinationKey);
 
