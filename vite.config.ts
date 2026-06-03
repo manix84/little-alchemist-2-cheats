@@ -2,8 +2,8 @@ import react from "@vitejs/plugin-react";
 import { VitePWA } from "vite-plugin-pwa";
 import { defineConfig } from "vitest/config";
 
-export default defineConfig({
-  base: "/little-alchemist-2-cheats/",
+export default defineConfig(({ command }) => ({
+  base: command === "serve" ? "/" : "/little-alchemist-2-cheats/",
   plugins: [
     react(),
     VitePWA({
@@ -77,4 +77,4 @@ export default defineConfig({
     globals: true,
     setupFiles: "./src/setupTests.ts",
   },
-});
+}));
