@@ -121,6 +121,7 @@ Please read [CONTRIBUTING.md](CONTRIBUTING.md) before opening a pull request.
 
 - [Code of Conduct](CODE_OF_CONDUCT.md)
 - [Contributing Guide](CONTRIBUTING.md)
+- [Privacy Policy](PRIVACY.md)
 - [Security Policy](SECURITY.md)
 - [Support Guide](SUPPORT.md)
 - [What's New](WHATSNEW.md)
