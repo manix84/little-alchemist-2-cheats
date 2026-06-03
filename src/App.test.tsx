@@ -3,6 +3,7 @@ import { afterEach, beforeEach, vi } from "vitest";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import App from "./App";
 import { RawData } from "./lib/Data";
+import { createProgressTransferToken } from "./lib/progressTransfer";
 
 const testData: RawData = {
   "1": {
@@ -93,6 +94,7 @@ test("renders the element search", () => {
   renderApp();
   expect(screen.getByLabelText(/elements/i)).toBeInTheDocument();
   expect(screen.getByLabelText(/include myths and monsters/i)).not.toBeChecked();
+  expect(screen.getByRole("button", { name: /transfer progress/i })).toBeInTheDocument();
 });
 
 test("dismisses the install prompt without showing it again", async () => {
@@ -184,6 +186,26 @@ test("filters recipes that use Myths and Monsters content by default", async () 
   fireEvent.click(await screen.findByRole("option", { name: /storm \(0\/1\)/i }));
 
   expect(screen.getByRole("heading", { name: /combinations \(0\/1\)/i })).toBeInTheDocument();
+});
+
+test("opens a progress transfer QR dialog", async () => {
+  renderApp();
+
+  fireEvent.click(screen.getByRole("button", { name: /transfer progress/i }));
+
+  expect(screen.getByRole("dialog", { name: /transfer progress/i })).toBeInTheDocument();
+  expect(await screen.findByRole("img", { name: /progress transfer qr code/i })).toBeInTheDocument();
+});
+
+test("imports progress from a transfer URL", async () => {
+  const progressToken = createProgressTransferToken(["3:1+2"], true);
+
+  renderApp([`/?progress=${progressToken}`]);
+
+  expect(await screen.findByLabelText(/include myths and monsters/i)).toBeChecked();
+  expect(window.localStorage.getItem("la2-discovered-combinations")).toBe(JSON.stringify(["3:1+2"]));
+  expect(window.localStorage.getItem("la2-include-dlc-content")).toBe("true");
+  expect(screen.getByTestId("location-path")).toHaveTextContent("/");
 });
 
 test("renders the 500 page route", () => {

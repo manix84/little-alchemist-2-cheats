@@ -10,6 +10,7 @@ The app lets you pick an element and see both sides of the recipe book:
 - **Combinations**: the recipes that create the selected element.
 - **Makes**: the elements you can create by combining the selected element with something else.
 - **Element pages**: each element has a clean URL, such as `/elements/fire`, for sharing and direct loading.
+- **Progress transfer**: copy discovered combinations to another device with a local QR code.
 - **Fast local data**: recipes and image assets are served from `public/`.
 
 ## Try It ✨

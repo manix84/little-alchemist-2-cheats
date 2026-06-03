@@ -1,8 +1,8 @@
 import CssBaseline from "@mui/material/CssBaseline";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
-import React, { useCallback, useMemo, useState } from "react";
-import { Link, Route, Routes, useNavigate, useParams } from "react-router-dom";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
 import styled from "styled-components";
 import "./App.css";
 import { ClearDiscoveredDialog } from "./components/ClearDiscoveredDialog";
@@ -10,6 +10,7 @@ import { CombinationSection } from "./components/CombinationSection";
 import { ElementSearch } from "./components/ElementSearch";
 import { InstallPromptBanner } from "./components/InstallPromptBanner";
 import { PrimaryElement } from "./components/PrimaryElement";
+import { ProgressTransferDialog } from "./components/ProgressTransferDialog";
 import useData from "./lib/Data";
 import {
   CombinationRowData,
@@ -20,18 +21,17 @@ import {
   getStoredDiscoveredCombinations,
   sortByDiscoveredState,
 } from "./lib/discoveredCombinations";
+import {
+  createProgressTransferToken,
+  getStoredIncludeDlcContent,
+  INCLUDE_DLC_CONTENT_KEY,
+  parseProgressTransferToken,
+  persistProgressTransfer,
+  PROGRESS_TRANSFER_PARAM,
+} from "./lib/progressTransfer";
 import { useInstallPrompt } from "./useInstallPrompt";
 
 const getElementPath = (elementSlug: string) => `/elements/${encodeURIComponent(elementSlug)}`;
-const INCLUDE_DLC_CONTENT_KEY = "la2-include-dlc-content";
-
-const getStoredIncludeDlcContent = () => {
-  try {
-    return window.localStorage.getItem(INCLUDE_DLC_CONTENT_KEY) === "true";
-  } catch {
-    return false;
-  }
-};
 
 export const App = () => {
   const prefersDarkMode = useMediaQuery("(prefers-color-scheme: dark)");
@@ -78,6 +78,7 @@ const RecipeFinder = () => {
   const { isLoading, getName, getSlug, getIDBySlug, getImage, getIsDlc, getOptions, getCombinations, getMakesCombinations } = useData();
   const { canInstall, dismissInstallPrompt, installApp } = useInstallPrompt();
   const navigate = useNavigate();
+  const location = useLocation();
   const { elementSlug } = useParams();
 
   const selectedSlug = elementSlug ? decodeURIComponent(elementSlug) : undefined;
@@ -85,6 +86,31 @@ const RecipeFinder = () => {
   const [discoveredCombinations, setDiscoveredCombinations] = useState<string[]>(getStoredDiscoveredCombinations);
   const [includeDlcContent, setIncludeDlcContent] = useState(getStoredIncludeDlcContent);
   const [isClearDiscoveredOpen, setIsClearDiscoveredOpen] = useState(false);
+  const [isProgressTransferOpen, setIsProgressTransferOpen] = useState(false);
+
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const progressToken = searchParams.get(PROGRESS_TRANSFER_PARAM);
+    if (!progressToken) return;
+
+    const progressPayload = parseProgressTransferToken(progressToken);
+    if (progressPayload) {
+      setDiscoveredCombinations(progressPayload.discoveredCombinations);
+      setIncludeDlcContent(progressPayload.includeDlcContent);
+      persistProgressTransfer(progressPayload);
+    }
+
+    searchParams.delete(PROGRESS_TRANSFER_PARAM);
+    const nextSearch = searchParams.toString();
+    navigate(
+      {
+        pathname: location.pathname,
+        search: nextSearch ? `?${nextSearch}` : "",
+        hash: location.hash,
+      },
+      { replace: true }
+    );
+  }, [location.hash, location.pathname, location.search, navigate]);
 
   const combinationHasDlc = useCallback(
     (combination: string[]) => !includeDlcContent && combination.some((id) => getIsDlc(id)),
@@ -130,6 +156,11 @@ const RecipeFinder = () => {
   const selectedOption = options.find((option) => option.id === selectedID) ?? null;
   const selectedElementMissing = Boolean(selectedSlug && !isLoading && !selectedOption);
   const discoveredCount = discoveredCombinations.length;
+  const progressTransferUrl = useMemo(() => {
+    const progressUrl = new URL(import.meta.env.BASE_URL, window.location.origin);
+    progressUrl.searchParams.set(PROGRESS_TRANSFER_PARAM, createProgressTransferToken(discoveredCombinations, includeDlcContent));
+    return progressUrl.toString();
+  }, [discoveredCombinations, includeDlcContent]);
   const selectedCombinationRows = useMemo<CombinationRowData[]>(() => {
     if (!selectedID || !selectedCombinations) return [];
 
@@ -245,10 +276,17 @@ const RecipeFinder = () => {
           <ErrorPage statusCode={404} title={"Element not found"} message={"That element is not in the current recipe data."} />
         ) : (
           <>
-            {!selectedID && discoveredCount > 0 && (
-              <ClearDiscoveredButton type={"button"} onClick={() => setIsClearDiscoveredOpen(true)}>
-                Clear discovered combinations
-              </ClearDiscoveredButton>
+            {!selectedID && (
+              <RootActions>
+                <RootActionButton type={"button"} onClick={() => setIsProgressTransferOpen(true)}>
+                  Transfer progress
+                </RootActionButton>
+                {discoveredCount > 0 && (
+                  <RootActionButton type={"button"} onClick={() => setIsClearDiscoveredOpen(true)}>
+                    Clear discovered combinations
+                  </RootActionButton>
+                )}
+              </RootActions>
             )}
             {selectedID && (
               <>
@@ -283,6 +321,9 @@ const RecipeFinder = () => {
       {canInstall && <InstallPromptBanner dismissInstallPrompt={dismissInstallPrompt} installApp={installApp} />}
       {isClearDiscoveredOpen && (
         <ClearDiscoveredDialog clearDiscoveredCombinations={clearDiscoveredCombinations} closeDialog={() => setIsClearDiscoveredOpen(false)} />
+      )}
+      {isProgressTransferOpen && (
+        <ProgressTransferDialog transferUrl={progressTransferUrl} closeDialog={() => setIsProgressTransferOpen(false)} />
       )}
     </PageContainer>
   );
@@ -382,8 +423,15 @@ const DlcToggleCheckbox = styled.input`
   accent-color: #2e7d32;
 `;
 
-const ClearDiscoveredButton = styled.button`
+const RootActions = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 14px;
   margin-top: 8px;
+`;
+
+const RootActionButton = styled.button`
   border: 0;
   background: transparent;
   color: rgba(127, 127, 127, 0.9);

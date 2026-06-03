@@ -19,6 +19,7 @@ This file tracks notable project changes in a lightweight, human-readable format
 - Added a recipe data refresh script that rebuilds `public/data/data.json` from the current Little Alchemy hints content.
 - Added a root-page opt-in for Myths and Monsters DLC content, stored locally and off by default.
 - Switched element routes to use readable slugs instead of numeric IDs.
+- Added QR-based progress transfer for moving discovered combinations and DLC preference between devices.
 
 ## 0.1.0 🌱
 

@@ -9,10 +9,13 @@ The app does not ask for an account, name, email address, payment details, or an
 The app may use browser storage for small local preferences and app state:
 
 - Discovered combination checkmarks.
+- Myths and Monsters DLC display preference.
 - Install prompt dismissal state.
 - PWA cache data needed to make the app work offline.
 
 This information is stored on your device by your browser. It is not sent to this project, a backend server, or a maintainer inbox.
+
+The progress transfer QR code encodes discovered combination checkmarks and the DLC display preference into a link. The QR code is generated in your browser and is not uploaded anywhere.
 
 ## Analytics 📊
 
