@@ -20,9 +20,10 @@ export const useInstallPrompt = () => {
 
   useEffect(() => {
     const handleBeforeInstallPrompt = (event: Event) => {
+      event.preventDefault();
+
       if (isDismissed || isInstalled) return;
 
-      event.preventDefault();
       setInstallEvent(event as BeforeInstallPromptEvent);
     };
 

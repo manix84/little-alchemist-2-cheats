@@ -78,6 +78,20 @@ test("does not show the prompt after local dismissal", async () => {
   expect(result.current.canInstall).toBe(false);
 });
 
+test("suppresses browser install UI after local dismissal", () => {
+  window.localStorage.setItem("la2-install-prompt-dismissed", "true");
+  const installEvent = createInstallEvent();
+
+  const { result } = renderHook(() => useInstallPrompt());
+
+  act(() => {
+    window.dispatchEvent(installEvent);
+  });
+
+  expect(installEvent.defaultPrevented).toBe(true);
+  expect(result.current.canInstall).toBe(false);
+});
+
 test("hides the prompt after the app is installed", async () => {
   const { result } = renderHook(() => useInstallPrompt());
 
