@@ -40,6 +40,7 @@ const patchPatterns = [
 const runGit = (args, options = {}) =>
   execFileSync("git", args, {
     encoding: "utf8",
+    maxBuffer: 10 * 1024 * 1024,
     stdio: ["ignore", "pipe", "pipe"],
     ...options,
   });
@@ -48,6 +49,14 @@ const getStagedFiles = () =>
   runGit(["diff", "--cached", "--name-only", "--diff-filter=ACMRT", "-z"])
     .split("\0")
     .filter(Boolean);
+
+const readJsonFromGit = (ref) => {
+  try {
+    return JSON.parse(runGit(["show", ref]));
+  } catch {
+    return undefined;
+  }
+};
 
 const parseVersion = (version) => {
   const match = /^(\d+)\.(\d+)\.(\d+)(?:[-+].*)?$/.exec(version);
@@ -68,9 +77,26 @@ const nextVersion = (version, bump) => {
 const isDocsOnlyFile = (file) => docsOnlyPatterns.some((pattern) => pattern.test(file));
 const matchesAny = (file, patterns) => patterns.some((pattern) => pattern.test(file));
 
+const stagedDiffHasAddedLineMatching = (pattern) => {
+  try {
+    execFileSync("git", ["diff", "--cached", "--quiet", "-G", pattern, "--"], {
+      stdio: "ignore",
+    });
+    return false;
+  } catch (error) {
+    if (error.status === 1) return true;
+    throw error;
+  }
+};
+
 const stagedDiffIncludesBreakingMarker = () => {
-  const diff = runGit(["diff", "--cached", "--"]);
-  return /BREAKING CHANGE|VERSION_BUMP=major|version:\s*major/i.test(diff);
+  return [
+    "BREAKING CHANGE",
+    "VERSION_BUMP=major",
+    "version:[[:space:]]*major",
+    "Version:[[:space:]]*major",
+    "VERSION:[[:space:]]*major",
+  ].some(stagedDiffHasAddedLineMatching);
 };
 
 const inferBump = (files) => {
@@ -104,6 +130,13 @@ const main = () => {
   const bump = override || inferBump(files);
   if (bump === "none") {
     console.log("🔢 Version bump skipped: no release-worthy staged changes.");
+    return;
+  }
+
+  const headPackageJson = readJsonFromGit("HEAD:package.json");
+  const stagedPackageJson = readJsonFromGit(":package.json");
+  if (headPackageJson?.version && stagedPackageJson?.version && headPackageJson.version !== stagedPackageJson.version) {
+    console.log(`🔢 Version bump skipped: staged version is already ${stagedPackageJson.version}.`);
     return;
   }
 

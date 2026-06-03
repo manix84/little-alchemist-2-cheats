@@ -10,6 +10,9 @@ This file tracks notable project changes in a lightweight, human-readable format
 - Documented the current recipe dataset snapshot: 720 elements and 3,455 known recipes.
 - Replaced Create React App with Vite and Vitest to remove stale tooling and keep `npm audit` clean.
 - Added a smart pre-commit version bump hook with override support.
+- Added PWA support with a generated service worker, installable manifest, and a subtle install prompt that respects dismissal.
+- Downloaded Little Alchemy image assets into `public/` so the app no longer depends on external image hosts at runtime.
+- Added a PWA offline verification script that checks the generated service worker precaches the app shell, recipe data, logo, and all element icons.
 
 ## 0.1.0 🌱
 

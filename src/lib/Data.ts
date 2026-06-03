@@ -38,7 +38,7 @@ const useData = () => {
     isLoading,
     error,
     getName: (id: string) => data?.[id].n,
-    getImage: (id: string) => `https://hints.littlealchemy2.com/icons/${id}.svg`,
+    getImage: (id: string) => `${import.meta.env.BASE_URL}elements/${id}.svg`,
     getCombinations: (id: string) => data?.[id].p,
     getMakesCombinations: (id: string) => {
       const output: { [key: string]: string[] } = {};
@@ -57,7 +57,7 @@ const useData = () => {
         .map(([id, element]) => ({
           id,
           label: element.n,
-          image: `https://hints.littlealchemy2.com/icons/${id}.svg`,
+          image: `${import.meta.env.BASE_URL}elements/${id}.svg`,
         }))
         .sort((a, b) => {
           const nameA = a.label.toUpperCase(); // ignore upper and lowercase
