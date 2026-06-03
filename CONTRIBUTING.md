@@ -57,6 +57,18 @@ Before opening a pull request:
 - Update documentation when behavior or setup changes.
 - Link any related issue.
 
+## Version Bumps 🔢
+
+The repo uses a versioned Git pre-commit hook in `.githooks/pre-commit`. `npm install` runs the `prepare` script to configure Git to use that hook path.
+
+On commit, `scripts/smart-version-bump.mjs` inspects staged files and updates `package.json` plus `package-lock.json` when release-worthy files changed:
+
+- Docs-only changes do not bump the version.
+- App UI/runtime changes bump the minor version.
+- Data, config, test, workflow, and tooling changes bump the patch version.
+- Staged diffs containing `BREAKING CHANGE`, `VERSION_BUMP=major`, or `version: major` bump the major version.
+- Set `VERSION_BUMP=major`, `VERSION_BUMP=minor`, `VERSION_BUMP=patch`, or `VERSION_BUMP=none` before committing to override the automatic choice.
+
 ## Reporting Problems 🐛
 
 Use the issue templates in this repository for bugs, feature requests, and data corrections. Clear reports should include what you searched for, what happened, and what you expected.
