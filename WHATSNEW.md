@@ -16,6 +16,7 @@ This file tracks notable project changes in a lightweight, human-readable format
 - Added a privacy policy covering local browser storage, offline cache behavior, the no-analytics/no-ads project model, and how to clear local data.
 - Replaced official-looking app and header logos with distinct hints/cheats branding so installed shortcuts are clearly for this fan guide.
 - Added clean routed element pages, app-level 404/500 pages, and a GitHub Pages fallback for direct URL loads.
+- Added a recipe data refresh script that rebuilds `public/data/data.json` from the current Little Alchemy hints content.
 
 ## 0.1.0 🌱
 

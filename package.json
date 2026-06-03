@@ -1,6 +1,6 @@
 {
   "name": "little-alchemist-2-cheats",
-  "version": "1.11.0",
+  "version": "1.12.0",
   "homepage": "https://manix84.github.io/little-alchemist-2-cheats",
   "private": true,
   "dependencies": {
@@ -21,6 +21,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
+    "data:refresh": "node scripts/refresh-data.mjs",
     "assets:download": "node scripts/download-assets.mjs",
     "pwa:verify": "node scripts/verify-pwa-offline.mjs",
     "prepare": "git config core.hooksPath .githooks",

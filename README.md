@@ -74,11 +74,19 @@ Each element entry is keyed by element ID and can include:
 
 Current dataset snapshot:
 
-- 720 elements
-- 3,455 known recipes
-- 535 elements with outbound "makes" data
+- 830 elements
+- 3,863 known recipes
+- 606 elements with outbound "makes" data
 
 When changing recipe data, keep IDs as strings and preserve the compact field names so the app can continue loading quickly in the browser.
+
+Refresh recipe data from the current Little Alchemy hints site with:
+
+```bash
+npm run data:refresh
+```
+
+The refresh script pulls the official item list, downloads each `item_data/*.json` file, rebuilds `p` from the parent recipe HTML, and regenerates `c` from those recipes. After refreshing data, run `npm run assets:download` so any newly discovered element icons are stored locally too.
 
 ## Local Assets 🖼️
 
