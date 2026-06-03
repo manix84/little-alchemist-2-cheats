@@ -9,7 +9,7 @@ The app lets you pick an element and see both sides of the recipe book:
 
 - **Combinations**: the recipes that create the selected element.
 - **Makes**: the elements you can create by combining the selected element with something else.
-- **Fast local data**: recipes load from `public/data/data.json`, while element icons are fetched from the official Little Alchemy 2 hints assets.
+- **Fast local data**: recipes and image assets are served from `public/`.
 
 ## Try It ✨
 
@@ -25,6 +25,7 @@ https://manix84.github.io/little-alchemist-2-cheats
 - styled-components
 - Vite
 - Vitest
+- PWA service worker support
 - GitHub Pages deployment
 
 ## Getting Started 🚀
@@ -53,6 +54,12 @@ Create a production build:
 npm run build
 ```
 
+Verify the built PWA precache includes the app shell, recipe data, and local image assets:
+
+```bash
+npm run pwa:verify
+```
+
 ## Data Notes 📚
 
 The searchable recipe data lives in `public/data/data.json`.
@@ -72,10 +79,28 @@ Current dataset snapshot:
 
 When changing recipe data, keep IDs as strings and preserve the compact field names so the app can continue loading quickly in the browser.
 
+## Local Assets 🖼️
+
+Element icons live in `public/elements/`, and the header logo lives in `public/brand/`.
+
+Refresh the local asset cache with:
+
+```bash
+npm run assets:download
+```
+
+The app should not need to fetch Little Alchemy image assets from an external site at runtime.
+
+## PWA Support 📲
+
+The app is installable on supported browsers and precaches the built app shell, recipe data, logo, and element icons for offline use. The install prompt is intentionally subtle and stores a dismissal locally, so it will not keep reappearing after someone closes it.
+
 ## Project Structure 🗂️
 
 ```text
 public/data/data.json  Recipe data used by the app
+public/elements/       Local element SVG icons
+public/brand/          Local brand/logo assets
 src/App.tsx            Main search and recipe display UI
 src/lib/Data.ts        Data loading and lookup helpers
 .github/workflows/     Build and GitHub Pages deployment
