@@ -1,7 +1,7 @@
 import CssBaseline from "@mui/material/CssBaseline";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useMemo, useState } from "react";
 import { Link, Route, Routes, useNavigate, useParams } from "react-router-dom";
 import styled from "styled-components";
 import "./App.css";
@@ -22,7 +22,16 @@ import {
 } from "./lib/discoveredCombinations";
 import { useInstallPrompt } from "./useInstallPrompt";
 
-const getElementPath = (elementID: string) => `/elements/${encodeURIComponent(elementID)}`;
+const getElementPath = (elementSlug: string) => `/elements/${encodeURIComponent(elementSlug)}`;
+const INCLUDE_DLC_CONTENT_KEY = "la2-include-dlc-content";
+
+const getStoredIncludeDlcContent = () => {
+  try {
+    return window.localStorage.getItem(INCLUDE_DLC_CONTENT_KEY) === "true";
+  } catch {
+    return false;
+  }
+};
 
 export const App = () => {
   const prefersDarkMode = useMediaQuery("(prefers-color-scheme: dark)");
@@ -42,7 +51,7 @@ export const App = () => {
       <ErrorBoundary>
         <Routes>
           <Route path={"/"} element={<RecipeFinder />} />
-          <Route path={"/elements/:elementID"} element={<RecipeFinder />} />
+          <Route path={"/elements/:elementSlug"} element={<RecipeFinder />} />
           <Route
             path={"/500"}
             element={
@@ -66,34 +75,60 @@ export const App = () => {
 };
 
 const RecipeFinder = () => {
-  const { isLoading, getName, getImage, getOptions, getCombinations, getMakesCombinations } = useData();
+  const { isLoading, getName, getSlug, getIDBySlug, getImage, getIsDlc, getOptions, getCombinations, getMakesCombinations } = useData();
   const { canInstall, dismissInstallPrompt, installApp } = useInstallPrompt();
   const navigate = useNavigate();
-  const { elementID } = useParams();
+  const { elementSlug } = useParams();
 
-  const selectedID = elementID ? decodeURIComponent(elementID) : undefined;
+  const selectedSlug = elementSlug ? decodeURIComponent(elementSlug) : undefined;
+  const selectedID = selectedSlug ? getIDBySlug(selectedSlug) : undefined;
   const [discoveredCombinations, setDiscoveredCombinations] = useState<string[]>(getStoredDiscoveredCombinations);
+  const [includeDlcContent, setIncludeDlcContent] = useState(getStoredIncludeDlcContent);
   const [isClearDiscoveredOpen, setIsClearDiscoveredOpen] = useState(false);
 
-  const selectedCombinations = useMemo(() => (selectedID ? getCombinations(selectedID) : undefined), [getCombinations, selectedID]);
-  const selectedMakes = useMemo(() => (selectedID ? getMakesCombinations(selectedID) : undefined), [getMakesCombinations, selectedID]);
+  const combinationHasDlc = useCallback(
+    (combination: string[]) => !includeDlcContent && combination.some((id) => getIsDlc(id)),
+    [getIsDlc, includeDlcContent]
+  );
+  const selectedCombinations = useMemo(
+    () => (selectedID ? getCombinations(selectedID)?.filter((combination) => !combinationHasDlc(combination)) : undefined),
+    [combinationHasDlc, getCombinations, selectedID]
+  );
+  const selectedMakes = useMemo(() => {
+    if (!selectedID) return undefined;
+
+    return Object.entries(getMakesCombinations(selectedID)).reduce<{ [key: string]: string[][] }>((output, [producesID, combinations]) => {
+      if (!includeDlcContent && getIsDlc(producesID)) {
+        return output;
+      }
+
+      const visibleCombinations = combinations.filter((combination) => !combinationHasDlc(combination));
+      if (visibleCombinations.length > 0) {
+        output[producesID] = visibleCombinations;
+      }
+
+      return output;
+    }, {});
+  }, [combinationHasDlc, getIsDlc, getMakesCombinations, includeDlcContent, selectedID]);
   const discoveredCombinationSet = useMemo(() => new Set(discoveredCombinations), [discoveredCombinations]);
   const options = useMemo(
     () =>
-      getOptions().map((option) => {
-        const combinations = getCombinations(option.id);
-        const totalCombinationCount = combinations?.length ?? 0;
-        const optionDiscoveredCount = getDiscoveredCombinationCount(option.id, combinations, discoveredCombinationSet);
+      getOptions()
+        .filter((option) => includeDlcContent || !getIsDlc(option.id))
+        .map((option) => {
+          const combinations = getCombinations(option.id)?.filter((combination) => !combinationHasDlc(combination));
+          const totalCombinationCount = combinations?.length ?? 0;
+          const optionDiscoveredCount = getDiscoveredCombinationCount(option.id, combinations, discoveredCombinationSet);
 
-        return {
-          ...option,
-          label: `${option.label} (${formatCombinationCount(optionDiscoveredCount, totalCombinationCount)})`,
-        };
-      }),
-    [discoveredCombinationSet, getCombinations, getOptions]
+          return {
+            ...option,
+            label: `${option.label} (${formatCombinationCount(optionDiscoveredCount, totalCombinationCount)})`,
+          };
+        }),
+    [combinationHasDlc, discoveredCombinationSet, getCombinations, getIsDlc, getOptions, includeDlcContent]
   );
   const selectedOption = options.find((option) => option.id === selectedID) ?? null;
-  const selectedElementMissing = Boolean(selectedID && !isLoading && !selectedOption);
+  const selectedElementMissing = Boolean(selectedSlug && !isLoading && !selectedOption);
   const discoveredCount = discoveredCombinations.length;
   const selectedCombinationRows = useMemo<CombinationRowData[]>(() => {
     if (!selectedID || !selectedCombinations) return [];
@@ -132,11 +167,24 @@ const RecipeFinder = () => {
   }, [discoveredCombinationSet, selectedID, selectedMakes]);
 
   const selectElement = (nextElementID: string | undefined) => {
-    navigate(nextElementID ? getElementPath(nextElementID) : "/");
+    const nextSlug = nextElementID ? getSlug(nextElementID) : undefined;
+    navigate(nextSlug ? getElementPath(nextSlug) : "/");
+  };
+
+  const setDlcContentIncluded = (isIncluded: boolean) => {
+    setIncludeDlcContent(isIncluded);
+    try {
+      window.localStorage.setItem(INCLUDE_DLC_CONTENT_KEY, String(isIncluded));
+    } catch {
+      // Keep the in-memory preference active even when browser storage is unavailable.
+    }
   };
 
   const navigateToElement = (elementID: string) => {
-    navigate(getElementPath(elementID));
+    const slug = getSlug(elementID);
+    if (!slug) return;
+
+    navigate(getElementPath(slug));
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -180,7 +228,19 @@ const RecipeFinder = () => {
         />
       </Header>
       <Main>
-        <ElementSearch isLoading={isLoading} options={options} selectedOption={selectedOption} onSelect={selectElement} />
+        <SearchControls>
+          <ElementSearch isLoading={isLoading} options={options} selectedOption={selectedOption} onSelect={selectElement} />
+          {!selectedSlug && (
+            <DlcToggleLabel>
+              <DlcToggleCheckbox
+                type={"checkbox"}
+                checked={includeDlcContent}
+                onChange={(event) => setDlcContentIncluded(event.target.checked)}
+              />
+              Include Myths and Monsters
+            </DlcToggleLabel>
+          )}
+        </SearchControls>
         {selectedElementMissing ? (
           <ErrorPage statusCode={404} title={"Element not found"} message={"That element is not in the current recipe data."} />
         ) : (
@@ -296,6 +356,30 @@ const Main = styled.main`
   flex-direction: column;
   align-items: center;
   width: 100%;
+`;
+
+const SearchControls = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+`;
+
+const DlcToggleLabel = styled.label`
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  color: rgba(127, 127, 127, 0.95);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+`;
+
+const DlcToggleCheckbox = styled.input`
+  width: 18px;
+  height: 18px;
+  accent-color: #2e7d32;
 `;
 
 const ClearDiscoveredButton = styled.button`

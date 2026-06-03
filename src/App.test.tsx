@@ -8,15 +8,19 @@ const testData: RawData = {
   "1": {
     prime: true,
     n: "Air",
+    s: "air",
     c: ["3"],
   },
   "2": {
     prime: true,
     n: "Fire",
+    s: "fire",
     c: ["3", "5"],
   },
   "3": {
     n: "Energy",
+    s: "energy",
+    c: ["7"],
     p: [
       ["1", "2"],
       ["2", "1"],
@@ -25,12 +29,33 @@ const testData: RawData = {
   "4": {
     prime: true,
     n: "Heat",
+    s: "heat",
   },
   "5": {
     n: "Spark",
+    s: "spark",
     p: [
       ["2", "4"],
       ["2", "2"],
+    ],
+  },
+  "6": {
+    d: "myths-and-monsters",
+    n: "Deity",
+    s: "deity",
+  },
+  "7": {
+    d: "myths-and-monsters",
+    n: "Ambrosia",
+    s: "ambrosia",
+    p: [["3", "6"]],
+  },
+  "8": {
+    n: "Storm",
+    s: "storm",
+    p: [
+      ["1", "2"],
+      ["1", "6"],
     ],
   },
 };
@@ -67,6 +92,7 @@ const renderApp = (initialEntries = ["/"]) =>
 test("renders the element search", () => {
   renderApp();
   expect(screen.getByLabelText(/elements/i)).toBeInTheDocument();
+  expect(screen.getByLabelText(/include myths and monsters/i)).not.toBeChecked();
 });
 
 test("dismisses the install prompt without showing it again", async () => {
@@ -96,20 +122,21 @@ test("clicking an element tile navigates to that element", async () => {
   fireEvent.click(await screen.findByRole("option", { name: /energy/i }));
 
   expect(await screen.findByRole("heading", { name: /combinations/i })).toBeInTheDocument();
-  expect(screen.getByTestId("location-path")).toHaveTextContent("/elements/3");
+  expect(screen.getByTestId("location-path")).toHaveTextContent("/elements/energy");
 
   fireEvent.click(screen.getAllByRole("button", { name: /^air$/i })[0]);
 
   expect(screen.getAllByText("Air").length).toBeGreaterThan(0);
-  expect(screen.getByTestId("location-path")).toHaveTextContent("/elements/1");
+  expect(screen.getByTestId("location-path")).toHaveTextContent("/elements/air");
   expect(window.scrollTo).toHaveBeenCalledWith({ top: 0, behavior: "smooth" });
 });
 
 test("loads an element from its direct URL", async () => {
-  renderApp(["/elements/3"]);
+  renderApp(["/elements/energy"]);
 
-  expect(await screen.findByText("Energy")).toBeInTheDocument();
+  expect((await screen.findAllByText("Energy")).length).toBeGreaterThan(0);
   expect(screen.getByRole("heading", { name: /combinations \(0\/2\)/i })).toBeInTheDocument();
+  expect(screen.queryByLabelText(/include myths and monsters/i)).not.toBeInTheDocument();
 });
 
 test("renders a 404 page for unknown routes and element URLs", async () => {
@@ -120,6 +147,43 @@ test("renders a 404 page for unknown routes and element URLs", async () => {
 test("renders a 404 page for unknown element IDs", async () => {
   renderApp(["/elements/not-real"]);
   expect(await screen.findByRole("heading", { name: /element not found/i })).toBeInTheDocument();
+});
+
+test("hides Myths and Monsters elements by default", async () => {
+  renderApp(["/elements/deity"]);
+
+  expect(await screen.findByRole("heading", { name: /element not found/i })).toBeInTheDocument();
+  expect(screen.queryByLabelText(/include myths and monsters/i)).not.toBeInTheDocument();
+});
+
+test("shows Myths and Monsters elements when the stored opt-in is enabled", async () => {
+  window.localStorage.setItem("la2-include-dlc-content", "true");
+
+  renderApp(["/elements/deity"]);
+
+  expect(await screen.findByText("Deity")).toBeInTheDocument();
+});
+
+test("stores the Myths and Monsters opt-in and includes DLC recipes", async () => {
+  renderApp();
+
+  expect(screen.getByLabelText(/include myths and monsters/i)).not.toBeChecked();
+  fireEvent.click(screen.getByLabelText(/include myths and monsters/i));
+  expect(window.localStorage.getItem("la2-include-dlc-content")).toBe("true");
+
+  fireEvent.change(screen.getByLabelText(/elements/i), { target: { value: "Storm" } });
+  fireEvent.click(await screen.findByRole("option", { name: /storm \(0\/2\)/i }));
+
+  expect(await screen.findByRole("heading", { name: /combinations \(0\/2\)/i })).toBeInTheDocument();
+});
+
+test("filters recipes that use Myths and Monsters content by default", async () => {
+  renderApp();
+
+  fireEvent.change(screen.getByLabelText(/elements/i), { target: { value: "Storm" } });
+  fireEvent.click(await screen.findByRole("option", { name: /storm \(0\/1\)/i }));
+
+  expect(screen.getByRole("heading", { name: /combinations \(0\/1\)/i })).toBeInTheDocument();
 });
 
 test("renders the 500 page route", () => {

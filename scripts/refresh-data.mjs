@@ -8,6 +8,7 @@ import currentData from "../public/data/data.json" with { type: "json" };
 
 export const HINTS_ORIGIN = "https://hints.littlealchemy2.com";
 export const DATA_PATH = path.join("public", "data", "data.json");
+export const MYTHS_AND_MONSTERS_DLC = "myths-and-monsters";
 
 const CONCURRENCY = 12;
 const USER_AGENT = "little-alchemist-2-cheats-data-refresh";
@@ -89,6 +90,16 @@ export const extractRecipePairs = (parentsHtml = "") => {
   return pairs;
 };
 
+export const getDlcKey = (item) => {
+  const dlcInfo = item.dlcInfo ?? "";
+
+  if (dlcInfo.includes("/content-pack/myths-and-monsters") || dlcInfo.includes("Myths and Monsters")) {
+    return MYTHS_AND_MONSTERS_DLC;
+  }
+
+  return undefined;
+};
+
 export const buildData = (items, previousData = {}) => {
   const primeIds = new Set(
     Object.entries(previousData)
@@ -101,7 +112,7 @@ export const buildData = (items, previousData = {}) => {
   for (const item of items) {
     const id = String(item.id ?? "");
 
-    if (!id || typeof item.name !== "string") {
+    if (!id || typeof item.name !== "string" || typeof item.slug !== "string") {
       throw new Error(`Item had an unexpected shape: ${JSON.stringify(item)}`);
     }
 
@@ -112,6 +123,12 @@ export const buildData = (items, previousData = {}) => {
     }
 
     entry.n = item.name;
+    entry.s = item.slug;
+
+    const dlcKey = getDlcKey(item);
+    if (dlcKey) {
+      entry.d = dlcKey;
+    }
 
     const pairs = extractRecipePairs(item.parents);
     if (pairs.length > 0) {

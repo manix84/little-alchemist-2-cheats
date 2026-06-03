@@ -9,7 +9,7 @@ The app lets you pick an element and see both sides of the recipe book:
 
 - **Combinations**: the recipes that create the selected element.
 - **Makes**: the elements you can create by combining the selected element with something else.
-- **Element pages**: each element has a clean URL, such as `/elements/2`, for sharing and direct loading.
+- **Element pages**: each element has a clean URL, such as `/elements/fire`, for sharing and direct loading.
 - **Fast local data**: recipes and image assets are served from `public/`.
 
 ## Try It ✨
@@ -68,8 +68,10 @@ The searchable recipe data lives in `public/data/data.json`.
 Each element entry is keyed by element ID and can include:
 
 - `n`: display name.
+- `s`: URL slug.
 - `p`: pairings that produce that element.
 - `c`: elements this element can help create.
+- `d`: DLC marker, currently `myths-and-monsters`.
 - `prime`: marker for base elements.
 
 Current dataset snapshot:
@@ -86,7 +88,7 @@ Refresh recipe data from the current Little Alchemy hints site with:
 npm run data:refresh
 ```
 
-The refresh script pulls the official item list, downloads each `item_data/*.json` file, rebuilds `p` from the parent recipe HTML, and regenerates `c` from those recipes. After refreshing data, run `npm run assets:download` so any newly discovered element icons are stored locally too.
+The refresh script pulls the official item list, downloads each `item_data/*.json` file, tags Myths and Monsters DLC content, rebuilds `p` from the parent recipe HTML, and regenerates `c` from those recipes. After refreshing data, run `npm run assets:download` so any newly discovered element icons are stored locally too.
 
 ## Local Assets 🖼️
 
