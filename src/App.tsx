@@ -249,19 +249,20 @@ const RecipeFinder = () => {
   };
 
   return (
-    <PageContainer>
-      <Header>
-        <img
-          src={`${import.meta.env.BASE_URL}brand/la2-logo.svg`}
-          style={{ filter: "drop-shadow(rgba(0, 0, 0, 0.5) 5px 5px 3px)" }}
-          className={"logo"}
-          alt={"Little Alchemy 2 - Cheats"}
-        />
-      </Header>
+    <PageContainer $hasFixedNav={Boolean(selectedID)} $isLanding={!selectedSlug}>
+      {!selectedID && (
+        <Header>
+          <HeaderLogo
+            src={`${import.meta.env.BASE_URL}brand/la2-logo.svg`}
+            $isLanding={!selectedSlug}
+            alt={"Little Alchemy 2 - Cheats"}
+          />
+        </Header>
+      )}
       <Main>
-        <SearchControls>
-          <ElementSearch isLoading={isLoading} options={options} selectedOption={selectedOption} onSelect={selectElement} />
-          {!selectedSlug && (
+        {!selectedSlug ? (
+          <LandingPanel>
+            <ElementSearch isLoading={isLoading} options={options} selectedOption={selectedOption} onSelect={selectElement} />
             <DlcToggleLabel>
               <DlcToggleCheckbox
                 type={"checkbox"}
@@ -270,27 +271,35 @@ const RecipeFinder = () => {
               />
               Include Myths and Monsters
             </DlcToggleLabel>
-          )}
-        </SearchControls>
+            <LandingProgress>{discoveredCount} discovered</LandingProgress>
+            <RootActions>
+              <RootActionButton type={"button"} onClick={() => setIsProgressTransferOpen(true)}>
+                Transfer progress
+              </RootActionButton>
+              {discoveredCount > 0 && (
+                <RootActionButton type={"button"} onClick={() => setIsClearDiscoveredOpen(true)}>
+                  Clear discovered combinations
+                </RootActionButton>
+              )}
+            </RootActions>
+          </LandingPanel>
+        ) : selectedID ? null : (
+          <SearchControls>
+            <ElementSearch isLoading={isLoading} options={options} selectedOption={selectedOption} onSelect={selectElement} />
+          </SearchControls>
+        )}
         {selectedElementMissing ? (
           <ErrorPage statusCode={404} title={"Element not found"} message={"That element is not in the current recipe data."} />
         ) : (
           <>
-            {!selectedID && (
-              <RootActions>
-                <RootActionButton type={"button"} onClick={() => setIsProgressTransferOpen(true)}>
-                  Transfer progress
-                </RootActionButton>
-                {discoveredCount > 0 && (
-                  <RootActionButton type={"button"} onClick={() => setIsClearDiscoveredOpen(true)}>
-                    Clear discovered combinations
-                  </RootActionButton>
-                )}
-              </RootActions>
-            )}
             {selectedID && (
               <>
-                <PrimaryElement elementID={selectedID} getImage={getImage} getName={getName} />
+                <PrimaryElement
+                  compactLogoSrc={`${import.meta.env.BASE_URL}icons/app-icon.svg`}
+                  logoSrc={`${import.meta.env.BASE_URL}brand/la2-logo.svg`}
+                >
+                  <ElementSearch isLoading={isLoading} options={options} selectedOption={selectedOption} onSelect={selectElement} />
+                </PrimaryElement>
                 {selectedCombinations && (
                   <CombinationSection
                     title={"Combinations"}
@@ -376,15 +385,17 @@ class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundarySta
   }
 }
 
-const PageContainer = styled.div`
-  padding-top: 10vh;
+const PageContainer = styled.div<{ $hasFixedNav?: boolean; $isLanding?: boolean }>`
+  box-sizing: border-box;
+  padding: ${({ $hasFixedNav, $isLanding }) =>
+    $hasFixedNav ? "92px 16px 32px" : $isLanding ? "48px 16px 32px" : "24px 16px 32px"};
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 2vh;
-  font-size: calc(10px + 2vmin);
+  justify-content: ${({ $isLanding }) => ($isLanding ? "flex-start" : "center")};
+  gap: ${({ $isLanding }) => ($isLanding ? "24px" : "18px")};
+  font-size: 16px;
 `;
 
 const Header = styled.header`
@@ -392,6 +403,18 @@ const Header = styled.header`
   flex-direction: column;
   align-items: center;
 `;
+
+const HeaderLogo = styled.img<{ $isLanding?: boolean }>`
+  width: ${({ $isLanding }) => ($isLanding ? "min(260px, 72vw)" : "min(210px, 64vw)")};
+  height: auto;
+  pointer-events: none;
+  filter: drop-shadow(rgba(0, 0, 0, 0.42) 4px 5px 4px);
+
+  @media (prefers-color-scheme: dark) {
+    filter: drop-shadow(rgba(0, 0, 0, 0.7) 4px 5px 5px);
+  }
+`;
+
 const Main = styled.main`
   display: flex;
   flex-direction: column;
@@ -405,16 +428,49 @@ const SearchControls = styled.div`
   align-items: center;
   justify-content: center;
   gap: 8px;
+  width: min(360px, calc(100vw - 32px));
+`;
+
+const LandingPanel = styled.section`
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  width: 420px;
+  max-width: calc(100vw - 64px);
+  padding: 18px;
+  border: 1px solid rgba(127, 127, 127, 0.22);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(12px) saturate(1.08);
+
+  @media (prefers-color-scheme: dark) {
+    border-color: rgba(255, 255, 255, 0.14);
+    background: rgba(18, 22, 30, 0.78);
+    box-shadow: 0 14px 40px rgba(0, 0, 0, 0.46);
+  }
+
+  @media (max-width: 480px) {
+    width: 280px;
+    max-width: calc(100vw - 96px);
+  }
 `;
 
 const DlcToggleLabel = styled.label`
   display: inline-flex;
   align-items: center;
+  justify-content: center;
   gap: 8px;
-  color: rgba(127, 127, 127, 0.95);
+  color: rgba(29, 36, 48, 0.84);
   font-size: 14px;
   font-weight: 700;
   cursor: pointer;
+
+  @media (prefers-color-scheme: dark) {
+    color: rgba(244, 247, 251, 0.82);
+  }
 `;
 
 const DlcToggleCheckbox = styled.input`
@@ -423,22 +479,48 @@ const DlcToggleCheckbox = styled.input`
   accent-color: #2e7d32;
 `;
 
+const LandingProgress = styled.div`
+  color: rgba(29, 36, 48, 0.78);
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
+
+  @media (prefers-color-scheme: dark) {
+    color: rgba(244, 247, 251, 0.74);
+  }
+`;
+
 const RootActions = styled.div`
   display: flex;
   flex-wrap: wrap;
   justify-content: center;
   gap: 8px 14px;
-  margin-top: 8px;
 `;
 
 const RootActionButton = styled.button`
-  border: 0;
-  background: transparent;
-  color: rgba(127, 127, 127, 0.9);
+  padding: 7px 10px;
+  border: 1px solid rgba(29, 36, 48, 0.22);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.76);
+  color: rgba(29, 36, 48, 0.86);
   font: inherit;
   font-size: 14px;
-  text-decoration: underline;
+  font-weight: 800;
   cursor: pointer;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.94);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    border-color: rgba(255, 255, 255, 0.16);
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(244, 247, 251, 0.88);
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.14);
+    }
+  }
 `;
 
 const ErrorContent = styled.section`

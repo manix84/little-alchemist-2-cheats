@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from "@testing-library/react";
+import { fireEvent, render, screen, waitFor } from "@testing-library/react";
 import { afterEach, beforeEach, vi } from "vitest";
 import { MemoryRouter, useLocation } from "react-router-dom";
 import App from "./App";
@@ -136,8 +136,8 @@ test("clicking an element tile navigates to that element", async () => {
 test("loads an element from its direct URL", async () => {
   renderApp(["/elements/energy"]);
 
-  expect((await screen.findAllByText("Energy")).length).toBeGreaterThan(0);
-  expect(screen.getByRole("heading", { name: /combinations \(0\/2\)/i })).toBeInTheDocument();
+  expect(await screen.findByRole("heading", { name: /combinations \(0\/2\)/i })).toBeInTheDocument();
+  await waitFor(() => expect(screen.getByLabelText(/elements/i)).toHaveValue("Energy (0/2)"));
   expect(screen.queryByLabelText(/include myths and monsters/i)).not.toBeInTheDocument();
 });
 
@@ -163,7 +163,7 @@ test("shows Myths and Monsters elements when the stored opt-in is enabled", asyn
 
   renderApp(["/elements/deity"]);
 
-  expect(await screen.findByText("Deity")).toBeInTheDocument();
+  await waitFor(() => expect(screen.getByLabelText(/elements/i)).toHaveValue("Deity (0/0)"));
 });
 
 test("stores the Myths and Monsters opt-in and includes DLC recipes", async () => {
