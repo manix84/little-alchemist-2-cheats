@@ -7,7 +7,6 @@ import { pipeline } from "node:stream/promises";
 import data from "../public/data/data.json" with { type: "json" };
 
 const ICON_BASE_URL = "https://hints.littlealchemy2.com/icons";
-const LOGO_URL = "https://hints.littlealchemy2.com/img/la2-logo.svg";
 const PUBLIC_DIR = "public";
 const ELEMENTS_DIR = path.join(PUBLIC_DIR, "elements");
 const BRAND_DIR = path.join(PUBLIC_DIR, "brand");
@@ -50,8 +49,6 @@ const runWithConcurrency = async (items, worker) => {
 const main = async () => {
   await fs.mkdir(ELEMENTS_DIR, { recursive: true });
   await fs.mkdir(BRAND_DIR, { recursive: true });
-
-  await download(LOGO_URL, path.join(BRAND_DIR, "la2-logo.svg"));
 
   const ids = Object.keys(data);
   let completed = 0;

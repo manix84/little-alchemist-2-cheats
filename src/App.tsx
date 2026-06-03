@@ -1,13 +1,25 @@
-import Autocomplete from "@mui/material/Autocomplete";
-import Box from "@mui/material/Box";
 import CssBaseline from "@mui/material/CssBaseline";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
-import TextField from "@mui/material/TextField";
 import useMediaQuery from "@mui/material/useMediaQuery";
-import React, { useEffect, useState } from "react";
+import React, { useMemo, useState } from "react";
 import styled from "styled-components";
 import "./App.css";
+import { ClearDiscoveredDialog } from "./components/ClearDiscoveredDialog";
+import { CombinationSection } from "./components/CombinationSection";
+import { ElementSearch } from "./components/ElementSearch";
+import { InstallPromptBanner } from "./components/InstallPromptBanner";
+import { PrimaryElement } from "./components/PrimaryElement";
 import useData from "./lib/Data";
+import {
+  CombinationRowData,
+  createCombinationKey,
+  DISCOVERED_COMBINATIONS_KEY,
+  formatCombinationCount,
+  getDiscoveredCombinationCount,
+  getStoredDiscoveredCombinations,
+  isSameCombination,
+  sortByDiscoveredState,
+} from "./lib/discoveredCombinations";
 import { useInstallPrompt } from "./useInstallPrompt";
 
 export const App = () => {
@@ -15,8 +27,65 @@ export const App = () => {
   const { canInstall, dismissInstallPrompt, installApp } = useInstallPrompt();
 
   const [selectedID, setSelectedID] = useState<string>();
-  const [selectedCombinations, setSelectedCombinations] = useState<string[][]>();
-  const [selectedMakes, setSelectedMakes] = useState<{ [key: string]: string[] }>();
+  const [discoveredCombinations, setDiscoveredCombinations] = useState<string[]>(getStoredDiscoveredCombinations);
+  const [isClearDiscoveredOpen, setIsClearDiscoveredOpen] = useState(false);
+
+  const selectedCombinations = useMemo(() => (selectedID ? getCombinations(selectedID) : undefined), [getCombinations, selectedID]);
+  const selectedMakes = useMemo(() => (selectedID ? getMakesCombinations(selectedID) : undefined), [getMakesCombinations, selectedID]);
+  const discoveredCombinationSet = useMemo(() => new Set(discoveredCombinations), [discoveredCombinations]);
+  const options = useMemo(
+    () =>
+      getOptions().map((option) => {
+        const combinations = getCombinations(option.id);
+        const totalCombinationCount = combinations?.length ?? 0;
+        const optionDiscoveredCount = getDiscoveredCombinationCount(option.id, combinations, discoveredCombinationSet);
+
+        return {
+          ...option,
+          label: `${option.label} (${formatCombinationCount(optionDiscoveredCount, totalCombinationCount)})`,
+        };
+      }),
+    [discoveredCombinationSet, getCombinations, getOptions]
+  );
+  const selectedOption = options.find((option) => option.id === selectedID) ?? null;
+  const discoveredCount = discoveredCombinations.length;
+  const selectedCombinationRows = useMemo<CombinationRowData[]>(() => {
+    if (!selectedID || !selectedCombinations) return [];
+
+    return sortByDiscoveredState(
+      selectedCombinations.map((combination) => ({
+        combinationKey: createCombinationKey(selectedID, combination),
+        items: combination.map((elementID, index) => ({
+          elementID,
+          symbolBefore: index > 0 ? ("+" as const) : undefined,
+        })),
+      })),
+      discoveredCombinationSet
+    );
+  }, [discoveredCombinationSet, selectedCombinations, selectedID]);
+  const selectedMakesRows = useMemo<CombinationRowData[]>(() => {
+    if (!selectedID || !selectedMakes) return [];
+
+    return sortByDiscoveredState(
+      Object.entries(selectedMakes).flatMap(([producesID, elementIDs]) =>
+        elementIDs.map((elementID) => {
+          const combination = getCombinations(producesID)?.find(
+            (candidateCombination) => isSameCombination(candidateCombination, [selectedID, elementID])
+          ) ?? [selectedID, elementID];
+
+          return {
+            combinationKey: createCombinationKey(producesID, combination),
+            items: [
+              { elementID: selectedID },
+              { elementID, symbolBefore: "+" as const },
+              { elementID: producesID, symbolBefore: "=" as const },
+            ],
+          };
+        })
+      ),
+      discoveredCombinationSet
+    );
+  }, [discoveredCombinationSet, getCombinations, selectedID, selectedMakes]);
 
   const prefersDarkMode = useMediaQuery("(prefers-color-scheme: dark)");
   const theme = React.useMemo(
@@ -28,14 +97,40 @@ export const App = () => {
       }),
     [prefersDarkMode]
   );
-  useEffect(() => {
-    console.log({ selectedID });
-    setSelectedCombinations(selectedID ? getCombinations(selectedID) : undefined);
-    setSelectedMakes(selectedID ? getMakesCombinations(selectedID) : undefined);
-    if (selectedID) {
-      console.log({ makesCombinations: getMakesCombinations(selectedID) });
+
+  const navigateToElement = (elementID: string) => {
+    setSelectedID(elementID);
+    window.scrollTo({ top: 0, behavior: "smooth" });
+  };
+
+  const setCombinationDiscovered = (combinationKey: string, isDiscovered: boolean) => {
+    setDiscoveredCombinations((currentCombinations) => {
+      const nextCombinations = new Set(currentCombinations);
+      if (isDiscovered) {
+        nextCombinations.add(combinationKey);
+      } else {
+        nextCombinations.delete(combinationKey);
+      }
+
+      const nextValue = Array.from(nextCombinations).sort();
+      try {
+        window.localStorage.setItem(DISCOVERED_COMBINATIONS_KEY, JSON.stringify(nextValue));
+      } catch {
+        // Keep the UI responsive even when browser storage is unavailable.
+      }
+      return nextValue;
+    });
+  };
+
+  const clearDiscoveredCombinations = () => {
+    try {
+      window.localStorage.removeItem(DISCOVERED_COMBINATIONS_KEY);
+    } catch {
+      // Clearing the in-memory state still gives the user the expected UI result.
     }
-  }, [selectedID]);
+    setDiscoveredCombinations([]);
+    setIsClearDiscoveredOpen(false);
+  };
 
   return (
     <ThemeProvider theme={theme}>
@@ -50,92 +145,46 @@ export const App = () => {
           />
         </Header>
         <Main>
-          <Autocomplete
-            disablePortal
-            loading={isLoading}
-            isOptionEqualToValue={(option, value) => option.id === value.id}
-            options={getOptions()}
-            sx={{ width: 300 }}
-            renderOption={(props, option) => (
-              <Box component={"li"} sx={{ "& > img": { mr: 2, flexShrink: 0 } }} {...props}>
-                <AutoCompleteIcon loading={"lazy"} src={option.image} alt={""} />
-                {option.label}
-              </Box>
-            )}
-            renderInput={(params) => <TextField {...params} label={"Elements"} />}
-            onChange={(_event, option) => {
-              setSelectedID(option?.id);
-            }}
-          />
+          <ElementSearch isLoading={isLoading} options={options} selectedOption={selectedOption} onSelect={setSelectedID} />
+          {!selectedID && discoveredCount > 0 && (
+            <ClearDiscoveredButton type={"button"} onClick={() => setIsClearDiscoveredOpen(true)}>
+              Clear discovered combinations
+            </ClearDiscoveredButton>
+          )}
           {selectedID && (
             <>
-              <PrimaryElementContainer>
-                <PrimaryElementImg src={getImage(selectedID)} alt={getName(selectedID)} />
-                <PrimaryElementName>{getName(selectedID)}</PrimaryElementName>
-              </PrimaryElementContainer>
+              <PrimaryElement elementID={selectedID} getImage={getImage} getName={getName} />
               {selectedCombinations && (
-                <>
-                  <h2>Combinations ({Object.values(selectedCombinations).length})</h2>
-                  {selectedCombinations.map((combination: string[]) => (
-                    <CombinationContainer>
-                      {combination.map((elementID: string, index: number) => (
-                        <>
-                          {index > 0 && <ElementSymbol>+</ElementSymbol>}
-                          <ElementContainer>
-                            <ElementImg src={getImage(elementID)} />
-                            <ElementName>{getName(elementID)}</ElementName>
-                          </ElementContainer>
-                        </>
-                      ))}
-                    </CombinationContainer>
-                  ))}
-                </>
+                <CombinationSection
+                  title={"Combinations"}
+                  rows={selectedCombinationRows}
+                  discoveredCombinationSet={discoveredCombinationSet}
+                  getImage={getImage}
+                  getName={getName}
+                  navigateToElement={navigateToElement}
+                  setCombinationDiscovered={setCombinationDiscovered}
+                />
               )}
               {selectedMakes && (
-                <>
-                  <h2>
-                    Makes ({Object.values(selectedMakes).reduce((currentCount, row) => currentCount + row.length, 0)})
-                  </h2>
-                  {Object.entries(selectedMakes).map(([producesID, elementIDs]) =>
-                    elementIDs.map((elementID) => (
-                      <CombinationContainer>
-                        <ElementContainer>
-                          <ElementImg src={getImage(selectedID)} />
-                          <ElementName>{getName(selectedID)}</ElementName>
-                        </ElementContainer>
-                        <ElementSymbol>+</ElementSymbol>
-                        <ElementContainer>
-                          <ElementImg src={getImage(elementID)} />
-                          <ElementName>{getName(elementID)}</ElementName>
-                        </ElementContainer>
-                        <ElementSymbol>=</ElementSymbol>
-                        <ElementContainer>
-                          <ElementImg src={getImage(producesID)} />
-                          <ElementName>{getName(producesID)}</ElementName>
-                        </ElementContainer>
-                      </CombinationContainer>
-                    ))
-                  )}
-                </>
+                <CombinationSection
+                  title={"Makes"}
+                  rows={selectedMakesRows}
+                  discoveredCombinationSet={discoveredCombinationSet}
+                  getImage={getImage}
+                  getName={getName}
+                  navigateToElement={navigateToElement}
+                  setCombinationDiscovered={setCombinationDiscovered}
+                />
               )}
             </>
           )}
         </Main>
-        {canInstall && (
-          <InstallPrompt role={"status"} aria-live={"polite"}>
-            <InstallPromptText>
-              <InstallPromptTitle>Install app 🧪</InstallPromptTitle>
-              <InstallPromptDescription>Keep the recipe finder one tap away.</InstallPromptDescription>
-            </InstallPromptText>
-            <InstallPromptActions>
-              <InstallPromptButton type={"button"} onClick={installApp}>
-                Install
-              </InstallPromptButton>
-              <DismissInstallPromptButton type={"button"} onClick={dismissInstallPrompt} aria-label={"Dismiss install prompt"}>
-                ×
-              </DismissInstallPromptButton>
-            </InstallPromptActions>
-          </InstallPrompt>
+        {canInstall && <InstallPromptBanner dismissInstallPrompt={dismissInstallPrompt} installApp={installApp} />}
+        {isClearDiscoveredOpen && (
+          <ClearDiscoveredDialog
+            clearDiscoveredCombinations={clearDiscoveredCombinations}
+            closeDialog={() => setIsClearDiscoveredOpen(false)}
+          />
         )}
       </PageContainer>
     </ThemeProvider>
@@ -163,121 +212,16 @@ const Main = styled.main`
   display: flex;
   flex-direction: column;
   align-items: center;
+  width: 100%;
 `;
 
-const AutoCompleteIcon = styled.img`
-  width: 20px;
-  filter: drop-shadow(0 0 0 rgba(0, 0, 0, 0.5));
-`;
-
-const ElementContainer = styled.div`
-  display: flex;
-  flex-direction: column;
-  justify-content: center;
-  align-items: center;
-  height: 120px;
-  width: 120px;
-  border-radius: 8px;
-  background-color: rgba(127, 127, 127, 0.1);
-  margin: 12px 0;
-`;
-
-const PrimaryElementContainer = styled(ElementContainer)`
-  height: 200px;
-  width: 200px;
-`;
-
-const ElementSymbol = styled(ElementContainer)`
-  font-size: 2.5em;
-  width: 50px;
-  background-color: transparent;
-`;
-
-const ElementImg = styled.img`
-  width: 50px;
-  filter: drop-shadow(0 0 2px rgba(0, 0, 0, 0.5));
-`;
-const PrimaryElementImg = styled(ElementImg)`
-  width: 150px;
-`;
-
-const ElementName = styled.div`
-  font-size: 0.5em;
-  text-transform: capitalize;
-  text-align: center;
-  font-weight: 700;
-`;
-const PrimaryElementName = styled(ElementName)`
-  font-size: 0.9em;
-`;
-
-const CombinationContainer = styled.div`
-  display: flex;
-  flex-direction: row;
-  gap: 5px;
-  max-width: 90vw;
-`;
-
-const InstallPrompt = styled.aside`
-  position: fixed;
-  right: 16px;
-  bottom: 16px;
-  z-index: 10;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  max-width: min(360px, calc(100vw - 32px));
-  padding: 10px 10px 10px 14px;
-  border: 1px solid rgba(127, 127, 127, 0.25);
-  border-radius: 8px;
-  background: rgba(24, 24, 24, 0.94);
-  color: #ffffff;
-  box-shadow: 0 8px 24px rgba(0, 0, 0, 0.24);
-  font-size: 14px;
-`;
-
-const InstallPromptText = styled.div`
-  min-width: 0;
-`;
-
-const InstallPromptTitle = styled.div`
-  font-weight: 700;
-  line-height: 1.2;
-`;
-
-const InstallPromptDescription = styled.div`
-  margin-top: 2px;
-  color: rgba(255, 255, 255, 0.76);
-  line-height: 1.25;
-`;
-
-const InstallPromptActions = styled.div`
-  display: flex;
-  align-items: center;
-  gap: 4px;
-`;
-
-const InstallPromptButton = styled.button`
-  min-height: 34px;
-  padding: 0 12px;
+const ClearDiscoveredButton = styled.button`
+  margin-top: 8px;
   border: 0;
-  border-radius: 6px;
-  background: #ffffff;
-  color: #111111;
-  font: inherit;
-  font-weight: 700;
-  cursor: pointer;
-`;
-
-const DismissInstallPromptButton = styled.button`
-  width: 34px;
-  height: 34px;
-  border: 0;
-  border-radius: 6px;
   background: transparent;
-  color: rgba(255, 255, 255, 0.72);
+  color: rgba(127, 127, 127, 0.9);
   font: inherit;
-  font-size: 22px;
-  line-height: 1;
+  font-size: 14px;
+  text-decoration: underline;
   cursor: pointer;
 `;
