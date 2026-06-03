@@ -18,10 +18,10 @@ jobs:
       with:
         fetch-depth: 2 
         
-    - name: Set up Node.js ${{ matrix.node-version }}
+    - name: Set up Node.js 24
       uses: actions/setup-node@v2
       with:
-        node-version: ${{ matrix.node-version }}
+        node-version: 24
         
     - name: Install dependencies
       run: npm clean-install
@@ -33,4 +33,4 @@ jobs:
       uses: peaceiris/actions-gh-pages@v3
       with:
         github_token: ${{ secrets.GITHUB_TOKEN }}
-        publish_dir: ./build
+        publish_dir: ./dist

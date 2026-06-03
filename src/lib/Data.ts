@@ -23,7 +23,7 @@ const useData = () => {
   useEffect(() => {
     const fetchData = async () =>
       setData(
-        await fetch(`${process.env.PUBLIC_URL}/data/data.json`)
+        await fetch(`${import.meta.env.BASE_URL}data/data.json`)
           .then((response) => response.json())
           .catch((err) => setError(err))
       );

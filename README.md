@@ -23,7 +23,8 @@ https://manix84.github.io/little-alchemist-2-cheats
 - TypeScript
 - Material UI
 - styled-components
-- Create React App
+- Vite
+- Vitest
 - GitHub Pages deployment
 
 ## Getting Started 🚀
