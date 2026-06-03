@@ -1,7 +1,8 @@
 import CssBaseline from "@mui/material/CssBaseline";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import useMediaQuery from "@mui/material/useMediaQuery";
-import React, { useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
+import { Link, Route, Routes, useLocation, useNavigate, useParams } from "react-router-dom";
 import styled from "styled-components";
 import "./App.css";
 import { ClearDiscoveredDialog } from "./components/ClearDiscoveredDialog";
@@ -9,6 +10,7 @@ import { CombinationSection } from "./components/CombinationSection";
 import { ElementSearch } from "./components/ElementSearch";
 import { InstallPromptBanner } from "./components/InstallPromptBanner";
 import { PrimaryElement } from "./components/PrimaryElement";
+import { ProgressTransferDialog } from "./components/ProgressTransferDialog";
 import useData from "./lib/Data";
 import {
   CombinationRowData,
@@ -17,38 +19,148 @@ import {
   formatCombinationCount,
   getDiscoveredCombinationCount,
   getStoredDiscoveredCombinations,
-  isSameCombination,
   sortByDiscoveredState,
 } from "./lib/discoveredCombinations";
+import {
+  createProgressTransferToken,
+  getStoredIncludeDlcContent,
+  INCLUDE_DLC_CONTENT_KEY,
+  parseProgressTransferToken,
+  persistProgressTransfer,
+  PROGRESS_TRANSFER_PARAM,
+} from "./lib/progressTransfer";
 import { useInstallPrompt } from "./useInstallPrompt";
 
+const getElementPath = (elementSlug: string) => `/elements/${encodeURIComponent(elementSlug)}`;
+
 export const App = () => {
-  const { isLoading, getName, getImage, getOptions, getCombinations, getMakesCombinations } = useData();
+  const prefersDarkMode = useMediaQuery("(prefers-color-scheme: dark)");
+  const theme = React.useMemo(
+    () =>
+      createTheme({
+        palette: {
+          mode: prefersDarkMode ? "dark" : "light",
+        },
+      }),
+    [prefersDarkMode]
+  );
+
+  return (
+    <ThemeProvider theme={theme}>
+      <CssBaseline />
+      <ErrorBoundary>
+        <Routes>
+          <Route path={"/"} element={<RecipeFinder />} />
+          <Route path={"/elements/:elementSlug"} element={<RecipeFinder />} />
+          <Route
+            path={"/500"}
+            element={
+              <PageContainer>
+                <ErrorPage statusCode={500} title={"Something went wrong"} message={"The recipe finder hit an unexpected problem."} />
+              </PageContainer>
+            }
+          />
+          <Route
+            path={"*"}
+            element={
+              <PageContainer>
+                <ErrorPage statusCode={404} title={"Page not found"} message={"That page does not exist in this recipe guide."} />
+              </PageContainer>
+            }
+          />
+        </Routes>
+      </ErrorBoundary>
+    </ThemeProvider>
+  );
+};
+
+const RecipeFinder = () => {
+  const { isLoading, getName, getSlug, getIDBySlug, getImage, getIsDlc, getOptions, getCombinations, getMakesCombinations } = useData();
   const { canInstall, dismissInstallPrompt, installApp } = useInstallPrompt();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { elementSlug } = useParams();
 
-  const [selectedID, setSelectedID] = useState<string>();
+  const selectedSlug = elementSlug ? decodeURIComponent(elementSlug) : undefined;
+  const selectedID = selectedSlug ? getIDBySlug(selectedSlug) : undefined;
   const [discoveredCombinations, setDiscoveredCombinations] = useState<string[]>(getStoredDiscoveredCombinations);
+  const [includeDlcContent, setIncludeDlcContent] = useState(getStoredIncludeDlcContent);
   const [isClearDiscoveredOpen, setIsClearDiscoveredOpen] = useState(false);
+  const [isProgressTransferOpen, setIsProgressTransferOpen] = useState(false);
 
-  const selectedCombinations = useMemo(() => (selectedID ? getCombinations(selectedID) : undefined), [getCombinations, selectedID]);
-  const selectedMakes = useMemo(() => (selectedID ? getMakesCombinations(selectedID) : undefined), [getMakesCombinations, selectedID]);
+  useEffect(() => {
+    const searchParams = new URLSearchParams(location.search);
+    const progressToken = searchParams.get(PROGRESS_TRANSFER_PARAM);
+    if (!progressToken) return;
+
+    const progressPayload = parseProgressTransferToken(progressToken);
+    if (progressPayload) {
+      setDiscoveredCombinations(progressPayload.discoveredCombinations);
+      setIncludeDlcContent(progressPayload.includeDlcContent);
+      persistProgressTransfer(progressPayload);
+    }
+
+    searchParams.delete(PROGRESS_TRANSFER_PARAM);
+    const nextSearch = searchParams.toString();
+    navigate(
+      {
+        pathname: location.pathname,
+        search: nextSearch ? `?${nextSearch}` : "",
+        hash: location.hash,
+      },
+      { replace: true }
+    );
+  }, [location.hash, location.pathname, location.search, navigate]);
+
+  const combinationHasDlc = useCallback(
+    (combination: string[]) => !includeDlcContent && combination.some((id) => getIsDlc(id)),
+    [getIsDlc, includeDlcContent]
+  );
+  const selectedCombinations = useMemo(
+    () => (selectedID ? getCombinations(selectedID)?.filter((combination) => !combinationHasDlc(combination)) : undefined),
+    [combinationHasDlc, getCombinations, selectedID]
+  );
+  const selectedMakes = useMemo(() => {
+    if (!selectedID) return undefined;
+
+    return Object.entries(getMakesCombinations(selectedID)).reduce<{ [key: string]: string[][] }>((output, [producesID, combinations]) => {
+      if (!includeDlcContent && getIsDlc(producesID)) {
+        return output;
+      }
+
+      const visibleCombinations = combinations.filter((combination) => !combinationHasDlc(combination));
+      if (visibleCombinations.length > 0) {
+        output[producesID] = visibleCombinations;
+      }
+
+      return output;
+    }, {});
+  }, [combinationHasDlc, getIsDlc, getMakesCombinations, includeDlcContent, selectedID]);
   const discoveredCombinationSet = useMemo(() => new Set(discoveredCombinations), [discoveredCombinations]);
   const options = useMemo(
     () =>
-      getOptions().map((option) => {
-        const combinations = getCombinations(option.id);
-        const totalCombinationCount = combinations?.length ?? 0;
-        const optionDiscoveredCount = getDiscoveredCombinationCount(option.id, combinations, discoveredCombinationSet);
+      getOptions()
+        .filter((option) => includeDlcContent || !getIsDlc(option.id))
+        .map((option) => {
+          const combinations = getCombinations(option.id)?.filter((combination) => !combinationHasDlc(combination));
+          const totalCombinationCount = combinations?.length ?? 0;
+          const optionDiscoveredCount = getDiscoveredCombinationCount(option.id, combinations, discoveredCombinationSet);
 
-        return {
-          ...option,
-          label: `${option.label} (${formatCombinationCount(optionDiscoveredCount, totalCombinationCount)})`,
-        };
-      }),
-    [discoveredCombinationSet, getCombinations, getOptions]
+          return {
+            ...option,
+            label: `${option.label} (${formatCombinationCount(optionDiscoveredCount, totalCombinationCount)})`,
+          };
+        }),
+    [combinationHasDlc, discoveredCombinationSet, getCombinations, getIsDlc, getOptions, includeDlcContent]
   );
   const selectedOption = options.find((option) => option.id === selectedID) ?? null;
+  const selectedElementMissing = Boolean(selectedSlug && !isLoading && !selectedOption);
   const discoveredCount = discoveredCombinations.length;
+  const progressTransferUrl = useMemo(() => {
+    const progressUrl = new URL(import.meta.env.BASE_URL, window.location.origin);
+    progressUrl.searchParams.set(PROGRESS_TRANSFER_PARAM, createProgressTransferToken(discoveredCombinations, includeDlcContent));
+    return progressUrl.toString();
+  }, [discoveredCombinations, includeDlcContent]);
   const selectedCombinationRows = useMemo<CombinationRowData[]>(() => {
     if (!selectedID || !selectedCombinations) return [];
 
@@ -67,17 +179,15 @@ export const App = () => {
     if (!selectedID || !selectedMakes) return [];
 
     return sortByDiscoveredState(
-      Object.entries(selectedMakes).flatMap(([producesID, elementIDs]) =>
-        elementIDs.map((elementID) => {
-          const combination = getCombinations(producesID)?.find(
-            (candidateCombination) => isSameCombination(candidateCombination, [selectedID, elementID])
-          ) ?? [selectedID, elementID];
+      Object.entries(selectedMakes).flatMap(([producesID, combinations]) =>
+        combinations.map((combination) => {
+          const otherElementID = combination.find((elementID) => elementID !== selectedID) ?? selectedID;
 
           return {
             combinationKey: createCombinationKey(producesID, combination),
             items: [
               { elementID: selectedID },
-              { elementID, symbolBefore: "+" as const },
+              { elementID: otherElementID, symbolBefore: "+" as const },
               { elementID: producesID, symbolBefore: "=" as const },
             ],
           };
@@ -85,21 +195,27 @@ export const App = () => {
       ),
       discoveredCombinationSet
     );
-  }, [discoveredCombinationSet, getCombinations, selectedID, selectedMakes]);
+  }, [discoveredCombinationSet, selectedID, selectedMakes]);
 
-  const prefersDarkMode = useMediaQuery("(prefers-color-scheme: dark)");
-  const theme = React.useMemo(
-    () =>
-      createTheme({
-        palette: {
-          mode: prefersDarkMode ? "dark" : "light",
-        },
-      }),
-    [prefersDarkMode]
-  );
+  const selectElement = (nextElementID: string | undefined) => {
+    const nextSlug = nextElementID ? getSlug(nextElementID) : undefined;
+    navigate(nextSlug ? getElementPath(nextSlug) : "/");
+  };
+
+  const setDlcContentIncluded = (isIncluded: boolean) => {
+    setIncludeDlcContent(isIncluded);
+    try {
+      window.localStorage.setItem(INCLUDE_DLC_CONTENT_KEY, String(isIncluded));
+    } catch {
+      // Keep the in-memory preference active even when browser storage is unavailable.
+    }
+  };
 
   const navigateToElement = (elementID: string) => {
-    setSelectedID(elementID);
+    const slug = getSlug(elementID);
+    if (!slug) return;
+
+    navigate(getElementPath(slug));
     window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
@@ -133,74 +249,153 @@ export const App = () => {
   };
 
   return (
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
-      <PageContainer>
+    <PageContainer $hasFixedNav={Boolean(selectedID)} $isLanding={!selectedSlug}>
+      {!selectedID && (
         <Header>
-          <img
+          <HeaderLogo
             src={`${import.meta.env.BASE_URL}brand/la2-logo.svg`}
-            style={{ filter: "drop-shadow(rgba(0, 0, 0, 0.5) 5px 5px 3px)" }}
-            className={"logo"}
+            $isLanding={!selectedSlug}
             alt={"Little Alchemy 2 - Cheats"}
           />
         </Header>
-        <Main>
-          <ElementSearch isLoading={isLoading} options={options} selectedOption={selectedOption} onSelect={setSelectedID} />
-          {!selectedID && discoveredCount > 0 && (
-            <ClearDiscoveredButton type={"button"} onClick={() => setIsClearDiscoveredOpen(true)}>
-              Clear discovered combinations
-            </ClearDiscoveredButton>
-          )}
-          {selectedID && (
-            <>
-              <PrimaryElement elementID={selectedID} getImage={getImage} getName={getName} />
-              {selectedCombinations && (
-                <CombinationSection
-                  title={"Combinations"}
-                  rows={selectedCombinationRows}
-                  discoveredCombinationSet={discoveredCombinationSet}
-                  getImage={getImage}
-                  getName={getName}
-                  navigateToElement={navigateToElement}
-                  setCombinationDiscovered={setCombinationDiscovered}
-                />
+      )}
+      <Main>
+        {!selectedSlug ? (
+          <LandingPanel>
+            <ElementSearch isLoading={isLoading} options={options} selectedOption={selectedOption} onSelect={selectElement} />
+            <DlcToggleLabel>
+              <DlcToggleCheckbox
+                type={"checkbox"}
+                checked={includeDlcContent}
+                onChange={(event) => setDlcContentIncluded(event.target.checked)}
+              />
+              Include Myths and Monsters
+            </DlcToggleLabel>
+            <LandingProgress>{discoveredCount} discovered</LandingProgress>
+            <RootActions>
+              <RootActionButton type={"button"} onClick={() => setIsProgressTransferOpen(true)}>
+                Transfer progress
+              </RootActionButton>
+              {discoveredCount > 0 && (
+                <RootActionButton type={"button"} onClick={() => setIsClearDiscoveredOpen(true)}>
+                  Clear discovered combinations
+                </RootActionButton>
               )}
-              {selectedMakes && (
-                <CombinationSection
-                  title={"Makes"}
-                  rows={selectedMakesRows}
-                  discoveredCombinationSet={discoveredCombinationSet}
-                  getImage={getImage}
-                  getName={getName}
-                  navigateToElement={navigateToElement}
-                  setCombinationDiscovered={setCombinationDiscovered}
-                />
-              )}
-            </>
-          )}
-        </Main>
-        {canInstall && <InstallPromptBanner dismissInstallPrompt={dismissInstallPrompt} installApp={installApp} />}
-        {isClearDiscoveredOpen && (
-          <ClearDiscoveredDialog
-            clearDiscoveredCombinations={clearDiscoveredCombinations}
-            closeDialog={() => setIsClearDiscoveredOpen(false)}
-          />
+            </RootActions>
+          </LandingPanel>
+        ) : selectedID ? null : (
+          <SearchControls>
+            <ElementSearch isLoading={isLoading} options={options} selectedOption={selectedOption} onSelect={selectElement} />
+          </SearchControls>
         )}
-      </PageContainer>
-    </ThemeProvider>
+        {selectedElementMissing ? (
+          <ErrorPage statusCode={404} title={"Element not found"} message={"That element is not in the current recipe data."} />
+        ) : (
+          <>
+            {selectedID && (
+              <>
+                <PrimaryElement
+                  compactLogoSrc={`${import.meta.env.BASE_URL}icons/app-icon.svg`}
+                  logoSrc={`${import.meta.env.BASE_URL}brand/la2-logo.svg`}
+                >
+                  <ElementSearch isLoading={isLoading} options={options} selectedOption={selectedOption} onSelect={selectElement} />
+                </PrimaryElement>
+                {selectedCombinations && (
+                  <CombinationSection
+                    title={"Combinations"}
+                    rows={selectedCombinationRows}
+                    discoveredCombinationSet={discoveredCombinationSet}
+                    getImage={getImage}
+                    getName={getName}
+                    navigateToElement={navigateToElement}
+                    setCombinationDiscovered={setCombinationDiscovered}
+                  />
+                )}
+                {selectedMakes && (
+                  <CombinationSection
+                    title={"Makes"}
+                    rows={selectedMakesRows}
+                    discoveredCombinationSet={discoveredCombinationSet}
+                    getImage={getImage}
+                    getName={getName}
+                    navigateToElement={navigateToElement}
+                    setCombinationDiscovered={setCombinationDiscovered}
+                  />
+                )}
+              </>
+            )}
+          </>
+        )}
+      </Main>
+      {canInstall && <InstallPromptBanner dismissInstallPrompt={dismissInstallPrompt} installApp={installApp} />}
+      {isClearDiscoveredOpen && (
+        <ClearDiscoveredDialog clearDiscoveredCombinations={clearDiscoveredCombinations} closeDialog={() => setIsClearDiscoveredOpen(false)} />
+      )}
+      {isProgressTransferOpen && (
+        <ProgressTransferDialog transferUrl={progressTransferUrl} closeDialog={() => setIsProgressTransferOpen(false)} />
+      )}
+    </PageContainer>
   );
 };
+
 export default App;
 
-const PageContainer = styled.div`
-  padding-top: 10vh;
+type ErrorPageProps = {
+  message: string;
+  statusCode: 404 | 500;
+  title: string;
+};
+
+const ErrorPage = ({ message, statusCode, title }: ErrorPageProps) => (
+  <ErrorContent>
+    <ErrorCode>{statusCode}</ErrorCode>
+    <ErrorTitle>{title}</ErrorTitle>
+    <ErrorMessage>{message}</ErrorMessage>
+    <HomeLink to={"/"}>Back to search</HomeLink>
+  </ErrorContent>
+);
+
+type ErrorBoundaryProps = {
+  children: React.ReactNode;
+};
+
+type ErrorBoundaryState = {
+  hasError: boolean;
+};
+
+class ErrorBoundary extends React.Component<ErrorBoundaryProps, ErrorBoundaryState> {
+  state: ErrorBoundaryState = {
+    hasError: false,
+  };
+
+  static getDerivedStateFromError() {
+    return { hasError: true };
+  }
+
+  render() {
+    if (this.state.hasError) {
+      return (
+        <PageContainer>
+          <ErrorPage statusCode={500} title={"Something went wrong"} message={"The recipe finder hit an unexpected problem."} />
+        </PageContainer>
+      );
+    }
+
+    return this.props.children;
+  }
+}
+
+const PageContainer = styled.div<{ $hasFixedNav?: boolean; $isLanding?: boolean }>`
+  box-sizing: border-box;
+  padding: ${({ $hasFixedNav, $isLanding }) =>
+    $hasFixedNav ? "92px 16px 32px" : $isLanding ? "48px 16px 32px" : "24px 16px 32px"};
   min-height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 2vh;
-  font-size: calc(10px + 2vmin);
+  justify-content: ${({ $isLanding }) => ($isLanding ? "flex-start" : "center")};
+  gap: ${({ $isLanding }) => ($isLanding ? "24px" : "18px")};
+  font-size: 16px;
 `;
 
 const Header = styled.header`
@@ -208,6 +403,18 @@ const Header = styled.header`
   flex-direction: column;
   align-items: center;
 `;
+
+const HeaderLogo = styled.img<{ $isLanding?: boolean }>`
+  width: ${({ $isLanding }) => ($isLanding ? "min(260px, 72vw)" : "min(210px, 64vw)")};
+  height: auto;
+  pointer-events: none;
+  filter: drop-shadow(rgba(0, 0, 0, 0.42) 4px 5px 4px);
+
+  @media (prefers-color-scheme: dark) {
+    filter: drop-shadow(rgba(0, 0, 0, 0.7) 4px 5px 5px);
+  }
+`;
+
 const Main = styled.main`
   display: flex;
   flex-direction: column;
@@ -215,13 +422,137 @@ const Main = styled.main`
   width: 100%;
 `;
 
-const ClearDiscoveredButton = styled.button`
-  margin-top: 8px;
-  border: 0;
-  background: transparent;
-  color: rgba(127, 127, 127, 0.9);
+const SearchControls = styled.div`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  width: min(360px, calc(100vw - 32px));
+`;
+
+const LandingPanel = styled.section`
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  gap: 12px;
+  width: 420px;
+  max-width: calc(100vw - 64px);
+  padding: 18px;
+  border: 1px solid rgba(127, 127, 127, 0.22);
+  border-radius: 8px;
+  background: rgba(255, 255, 255, 0.72);
+  box-shadow: 0 12px 36px rgba(0, 0, 0, 0.12);
+  backdrop-filter: blur(12px) saturate(1.08);
+
+  @media (prefers-color-scheme: dark) {
+    border-color: rgba(255, 255, 255, 0.14);
+    background: rgba(18, 22, 30, 0.78);
+    box-shadow: 0 14px 40px rgba(0, 0, 0, 0.46);
+  }
+
+  @media (max-width: 480px) {
+    width: 280px;
+    max-width: calc(100vw - 96px);
+  }
+`;
+
+const DlcToggleLabel = styled.label`
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  color: rgba(29, 36, 48, 0.84);
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+
+  @media (prefers-color-scheme: dark) {
+    color: rgba(244, 247, 251, 0.82);
+  }
+`;
+
+const DlcToggleCheckbox = styled.input`
+  width: 18px;
+  height: 18px;
+  accent-color: #2e7d32;
+`;
+
+const LandingProgress = styled.div`
+  color: rgba(29, 36, 48, 0.78);
+  font-size: 13px;
+  font-weight: 800;
+  text-align: center;
+
+  @media (prefers-color-scheme: dark) {
+    color: rgba(244, 247, 251, 0.74);
+  }
+`;
+
+const RootActions = styled.div`
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 8px 14px;
+`;
+
+const RootActionButton = styled.button`
+  padding: 7px 10px;
+  border: 1px solid rgba(29, 36, 48, 0.22);
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.76);
+  color: rgba(29, 36, 48, 0.86);
   font: inherit;
   font-size: 14px;
-  text-decoration: underline;
+  font-weight: 800;
   cursor: pointer;
+
+  &:hover {
+    background: rgba(255, 255, 255, 0.94);
+  }
+
+  @media (prefers-color-scheme: dark) {
+    border-color: rgba(255, 255, 255, 0.16);
+    background: rgba(255, 255, 255, 0.08);
+    color: rgba(244, 247, 251, 0.88);
+
+    &:hover {
+      background: rgba(255, 255, 255, 0.14);
+    }
+  }
+`;
+
+const ErrorContent = styled.section`
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 10px;
+  max-width: min(560px, calc(100vw - 32px));
+  text-align: center;
+`;
+
+const ErrorCode = styled.div`
+  color: #ff9f1c;
+  font-size: 72px;
+  font-weight: 900;
+  line-height: 1;
+`;
+
+const ErrorTitle = styled.h1`
+  margin: 0;
+  font-size: 32px;
+`;
+
+const ErrorMessage = styled.p`
+  margin: 0;
+  color: rgba(127, 127, 127, 0.95);
+  font-size: 18px;
+`;
+
+const HomeLink = styled(Link)`
+  margin-top: 10px;
+  color: inherit;
+  font-size: 16px;
+  font-weight: 700;
 `;

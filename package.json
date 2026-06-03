@@ -1,6 +1,6 @@
 {
   "name": "little-alchemist-2-cheats",
-  "version": "1.9.0",
+  "version": "1.15.0",
   "homepage": "https://manix84.github.io/little-alchemist-2-cheats",
   "private": true,
   "dependencies": {
@@ -8,8 +8,10 @@
     "@emotion/styled": "^11.10.4",
     "@mdi/js": "^7.4.47",
     "@mui/material": "^5.10.6",
+    "qrcode": "^1.5.4",
     "react": "^18.2.0",
     "react-dom": "^18.2.0",
+    "react-router-dom": "^6.30.4",
     "styled-components": "^5.3.6"
   },
   "scripts": {
@@ -20,6 +22,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "typecheck": "tsc --noEmit",
+    "data:refresh": "node scripts/refresh-data.mjs",
     "assets:download": "node scripts/download-assets.mjs",
     "pwa:verify": "node scripts/verify-pwa-offline.mjs",
     "prepare": "git config core.hooksPath .githooks",
@@ -42,6 +45,7 @@
     "@testing-library/jest-dom": "^6.9.1",
     "@testing-library/react": "^13.4.0",
     "@types/node": "^24.10.1",
+    "@types/qrcode": "^1.5.6",
     "@types/react": "^18.0.21",
     "@types/react-dom": "^18.0.6",
     "@types/styled-components": "^5.1.26",

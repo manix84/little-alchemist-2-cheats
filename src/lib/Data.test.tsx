@@ -8,16 +8,24 @@ const testData: RawData = {
   "1": {
     prime: true,
     n: "Air",
+    s: "air",
     c: ["3"],
   },
   "2": {
     prime: true,
     n: "Fire",
+    s: "fire",
     c: ["3"],
   },
   "3": {
     n: "Energy",
+    s: "energy",
     p: [["1", "2"]],
+  },
+  "1_41": {
+    d: "myths-and-monsters",
+    n: "Immortality",
+    s: "immortality",
   },
 };
 
@@ -56,6 +64,11 @@ test("loads data and exposes sorted autocomplete options", async () => {
       image: `${baseUrl}elements/2.svg`,
       label: "Fire",
     },
+    {
+      id: "1_41",
+      image: `${baseUrl}elements/1_41.svg`,
+      label: "Immortality",
+    },
   ]);
 });
 
@@ -65,10 +78,14 @@ test("looks up combinations and reverse makes combinations", async () => {
   await waitFor(() => expect(result.current.isLoading).toBe(false));
 
   expect(result.current.getName("3")).toBe("Energy");
+  expect(result.current.getSlug("3")).toBe("energy");
+  expect(result.current.getIDBySlug("energy")).toBe("3");
   expect(result.current.getImage("3")).toBe(`${baseUrl}elements/3.svg`);
   expect(result.current.getCombinations("3")).toEqual([["1", "2"]]);
+  expect(result.current.getIsDlc("1_41")).toBe(true);
+  expect(result.current.getIsDlc("3")).toBe(false);
   expect(result.current.getMakesCombinations("1")).toEqual({
-    "3": ["2"],
+    "3": [["1", "2"]],
   });
 });
 

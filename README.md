@@ -9,6 +9,8 @@ The app lets you pick an element and see both sides of the recipe book:
 
 - **Combinations**: the recipes that create the selected element.
 - **Makes**: the elements you can create by combining the selected element with something else.
+- **Element pages**: each element has a clean URL, such as `/elements/fire`, for sharing and direct loading.
+- **Progress transfer**: copy discovered combinations to another device with a local QR code.
 - **Fast local data**: recipes and image assets are served from `public/`.
 
 ## Try It ✨
@@ -67,17 +69,27 @@ The searchable recipe data lives in `public/data/data.json`.
 Each element entry is keyed by element ID and can include:
 
 - `n`: display name.
+- `s`: URL slug.
 - `p`: pairings that produce that element.
 - `c`: elements this element can help create.
+- `d`: DLC marker, currently `myths-and-monsters`.
 - `prime`: marker for base elements.
 
 Current dataset snapshot:
 
-- 720 elements
-- 3,455 known recipes
-- 535 elements with outbound "makes" data
+- 830 elements
+- 3,863 known recipes
+- 606 elements with outbound "makes" data
 
 When changing recipe data, keep IDs as strings and preserve the compact field names so the app can continue loading quickly in the browser.
+
+Refresh recipe data from the current Little Alchemy hints site with:
+
+```bash
+npm run data:refresh
+```
+
+The refresh script pulls the official item list, downloads each `item_data/*.json` file, tags Myths and Monsters DLC content, rebuilds `p` from the parent recipe HTML, and regenerates `c` from those recipes. After refreshing data, run `npm run assets:download` so any newly discovered element icons are stored locally too.
 
 ## Local Assets 🖼️
 
@@ -103,6 +115,7 @@ public/elements/       Local element SVG icons
 public/brand/          Local brand/logo assets
 src/App.tsx            Main search and recipe display UI
 src/lib/Data.ts        Data loading and lookup helpers
+public/404.html        GitHub Pages fallback for direct clean URLs
 .github/workflows/     Build and GitHub Pages deployment
 ```
 

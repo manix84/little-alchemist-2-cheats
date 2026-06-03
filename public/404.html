@@ -1,0 +1,16 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Little Alchemy 2 Cheats</title>
+    <script>
+      const pathParts = window.location.pathname.split("/").filter(Boolean);
+      const basePath = pathParts.length > 0 ? `/${pathParts[0]}/` : "/";
+      const redirectPath = `${window.location.pathname}${window.location.search}${window.location.hash}`;
+      window.location.replace(`${basePath}?redirect=${encodeURIComponent(redirectPath)}`);
+    </script>
+  </head>
+  <body>
+    Redirecting...
+  </body>
+</html>

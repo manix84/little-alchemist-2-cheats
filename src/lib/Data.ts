@@ -2,12 +2,16 @@ import React, { useEffect } from "react";
 
 export type RawData = {
   [key: string]: {
+    d?: "myths-and-monsters"; // DLC
     prime?: boolean;
     n: string; // Name
+    s: string; // Slug
     c?: string[]; // Makes
     p?: string[][]; // Combinations
   };
 };
+
+export const MYTHS_AND_MONSTERS_DLC = "myths-and-monsters";
 
 export interface AutocompleteOption {
   id: string;
@@ -37,17 +41,20 @@ const useData = () => {
   return {
     isLoading,
     error,
-    getName: (id: string) => data?.[id].n,
+    getName: (id: string) => data?.[id]?.n,
+    getSlug: (id: string) => data?.[id]?.s,
+    getIDBySlug: (slug: string) => Object.entries(data ?? {}).find(([, element]) => element.s === slug)?.[0],
     getImage: (id: string) => `${import.meta.env.BASE_URL}elements/${id}.svg`,
-    getCombinations: (id: string) => data?.[id].p,
+    getIsDlc: (id: string) => data?.[id]?.d === MYTHS_AND_MONSTERS_DLC,
+    getCombinations: (id: string) => data?.[id]?.p,
     getMakesCombinations: (id: string) => {
-      const output: { [key: string]: string[] } = {};
-      data?.[id].c?.forEach((cid) => {
+      const output: { [key: string]: string[][] } = {};
+      data?.[id]?.c?.forEach((cid) => {
         output[cid] = [];
-        data?.[cid].p
+        data?.[cid]?.p
           ?.filter((combs) => combs.some((comb) => comb === id))
           .forEach((combs) => {
-            output[cid].push(combs[0] === id ? combs[1] : combs[0]);
+            output[cid].push(combs);
           });
       });
       return output;
