@@ -75,7 +75,7 @@ export const App = () => {
 };
 
 const RecipeFinder = () => {
-  const { isLoading, getName, getSlug, getIDBySlug, getImage, getIsDlc, getOptions, getCombinations, getMakesCombinations } = useData();
+  const { isLoading, getName, getSlug, getIDBySlug, getImage, getIsDlc, getOptions, getCombinations, getMakesCombinations, getAllCombinationKeys } = useData();
   const { canInstall, dismissInstallPrompt, installApp } = useInstallPrompt();
   const navigate = useNavigate();
   const location = useLocation();
@@ -88,12 +88,15 @@ const RecipeFinder = () => {
   const [isClearDiscoveredOpen, setIsClearDiscoveredOpen] = useState(false);
   const [isProgressTransferOpen, setIsProgressTransferOpen] = useState(false);
 
+  const knownCombinationKeys = useMemo(() => getAllCombinationKeys(), [getAllCombinationKeys]);
+
   useEffect(() => {
     const searchParams = new URLSearchParams(location.search);
     const progressToken = searchParams.get(PROGRESS_TRANSFER_PARAM);
     if (!progressToken) return;
+    if (isLoading) return;
 
-    const progressPayload = parseProgressTransferToken(progressToken);
+    const progressPayload = parseProgressTransferToken(progressToken, knownCombinationKeys);
     if (progressPayload) {
       setDiscoveredCombinations(progressPayload.discoveredCombinations);
       setIncludeDlcContent(progressPayload.includeDlcContent);
@@ -110,7 +113,7 @@ const RecipeFinder = () => {
       },
       { replace: true }
     );
-  }, [location.hash, location.pathname, location.search, navigate]);
+  }, [isLoading, knownCombinationKeys, location.hash, location.pathname, location.search, navigate]);
 
   const combinationHasDlc = useCallback(
     (combination: string[]) => !includeDlcContent && combination.some((id) => getIsDlc(id)),
@@ -158,9 +161,9 @@ const RecipeFinder = () => {
   const discoveredCount = discoveredCombinations.length;
   const progressTransferUrl = useMemo(() => {
     const progressUrl = new URL(import.meta.env.BASE_URL, window.location.origin);
-    progressUrl.searchParams.set(PROGRESS_TRANSFER_PARAM, createProgressTransferToken(discoveredCombinations, includeDlcContent));
+    progressUrl.searchParams.set(PROGRESS_TRANSFER_PARAM, createProgressTransferToken(discoveredCombinations, includeDlcContent, knownCombinationKeys));
     return progressUrl.toString();
-  }, [discoveredCombinations, includeDlcContent]);
+  }, [discoveredCombinations, includeDlcContent, knownCombinationKeys]);
   const selectedCombinationRows = useMemo<CombinationRowData[]>(() => {
     if (!selectedID || !selectedCombinations) return [];
 

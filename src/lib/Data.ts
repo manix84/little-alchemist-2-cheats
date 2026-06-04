@@ -59,6 +59,10 @@ const useData = () => {
       });
       return output;
     },
+    getAllCombinationKeys: () =>
+      Object.entries(data ?? {})
+        .flatMap(([producesID, element]) => element.p?.map((combination) => `${producesID}:${combination.join("+")}`) ?? [])
+        .sort(),
     getOptions: (): AutocompleteOption[] =>
       Object.entries(data || {})
         .map(([id, element]) => ({
