@@ -8,19 +8,26 @@ type ProgressTransferDialogProps = {
 };
 
 export const ProgressTransferDialog = ({ closeDialog, transferUrl }: ProgressTransferDialogProps) => {
+  const [qrCodeError, setQrCodeError] = useState("");
   const [qrCodeUrl, setQrCodeUrl] = useState("");
 
   useEffect(() => {
     let isMounted = true;
+    setQrCodeError("");
+    setQrCodeUrl("");
 
     QRCode.toString(transferUrl, {
-      errorCorrectionLevel: "M",
+      errorCorrectionLevel: "L",
       margin: 2,
       type: "svg",
       width: 256,
     }).then((nextQrCodeSvg) => {
       if (isMounted) {
         setQrCodeUrl(`data:image/svg+xml;charset=UTF-8,${encodeURIComponent(nextQrCodeSvg)}`);
+      }
+    }).catch(() => {
+      if (isMounted) {
+        setQrCodeError("This progress link is too large for a QR code. Copy the link instead.");
       }
     });
 
@@ -37,7 +44,13 @@ export const ProgressTransferDialog = ({ closeDialog, transferUrl }: ProgressTra
     <DialogBackdrop role={"presentation"}>
       <DialogCard role={"dialog"} aria-modal={"true"} aria-labelledby={"progress-transfer-title"}>
         <DialogTitle id={"progress-transfer-title"}>Transfer progress</DialogTitle>
-        <QrFrame>{qrCodeUrl ? <QrImage src={qrCodeUrl} alt={"Progress transfer QR code"} /> : <QrPlaceholder>Generating QR</QrPlaceholder>}</QrFrame>
+        <QrFrame>
+          {qrCodeUrl ? (
+            <QrImage src={qrCodeUrl} alt={"Progress transfer QR code"} />
+          ) : (
+            <QrPlaceholder>{qrCodeError || "Generating QR"}</QrPlaceholder>
+          )}
+        </QrFrame>
         <DialogActions>
           <CopyButton type={"button"} onClick={copyTransferUrl}>
             Copy link

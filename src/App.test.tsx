@@ -202,7 +202,7 @@ test("imports progress from a transfer URL", async () => {
 
   renderApp([`/?progress=${progressToken}`]);
 
-  expect(await screen.findByLabelText(/include myths and monsters/i)).toBeChecked();
+  await waitFor(() => expect(screen.getByLabelText(/include myths and monsters/i)).toBeChecked());
   expect(window.localStorage.getItem("la2-discovered-combinations")).toBe(JSON.stringify(["3:1+2"]));
   expect(window.localStorage.getItem("la2-include-dlc-content")).toBe("true");
   expect(screen.getByTestId("location-path")).toHaveTextContent("/");
